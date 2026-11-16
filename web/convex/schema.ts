@@ -55,4 +55,27 @@ export default defineSchema({
     userId: v.string(),
     at: v.number(),
   }).index("by_user_at", ["userId", "at"]),
+
+  // ChatGPT: live sync
+  syncFiles: defineTable({
+    projectId: v.id("projects"),
+    path: v.string(),
+    size: v.number(),
+    snapshotVersion: v.number(),
+    updatedAt: v.number(),
+  }).index("by_project_path", ["projectId", "path"]).index("by_project", ["projectId"]),
+
+  syncSnapshots: defineTable({
+    fileId: v.id("syncFiles"),
+    version: v.number(),
+    state: v.bytes(),
+    createdAt: v.number(),
+  }).index("by_file_version", ["fileId", "version"]),
+
+  syncUpdates: defineTable({
+    fileId: v.id("syncFiles"),
+    version: v.number(),
+    update: v.bytes(),
+    createdAt: v.number(),
+  }).index("by_file_version", ["fileId", "version"]),
 });

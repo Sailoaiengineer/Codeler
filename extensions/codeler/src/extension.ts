@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { sample } from './sample';
 import { Auth } from './auth';
+import { startSync } from './sync';
 
 // Panels are plain HTML files in media/; each gets the shared stylesheet and a strict CSP.
 class Panel implements vscode.WebviewViewProvider {
@@ -53,6 +54,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 
 export function activate(ctx: vscode.ExtensionContext) {
 	const auth = new Auth(ctx.secrets);
+	ctx.subscriptions.push(startSync(ctx, auth));
 	for (const [id, page] of [['codeler.chat', 'chat'], ['codeler.activity', 'activity'], ['codeler.collaborators', 'collaborators'], ['codeler.workspaces', 'workspaces']])
 		ctx.subscriptions.push(vscode.window.registerWebviewViewProvider(id, new Panel(ctx, page), { webviewOptions: { retainContextWhenHidden: true } }));
 	// Clicking Team in the activity bar opens the full Team page instead of a narrow side panel.

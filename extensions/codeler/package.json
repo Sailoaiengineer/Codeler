@@ -185,6 +185,11 @@
           "type": "string",
           "default": "",
           "description": "Address of the Codeler Convex backend (https://<deployment>.convex.cloud)."
+        },
+        "codeler.projectId": {
+          "type": "string",
+          "default": "",
+          "description": "Convex project ID for the open team project."
         }
       }
     },
@@ -198,5 +203,12 @@
       ]
     }
   },
-  "scripts": {}
+  "scripts": {},
+  "dependencies": {
+    "convex": "^1.48.0",
+    "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
 }
