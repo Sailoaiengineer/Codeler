@@ -94,4 +94,39 @@ export default defineSchema({
     }),
     lastSeen: v.number(),
   }).index("by_project", ["projectId"]).index("by_project_window", ["projectId", "window"]),
+
+  // Claude (Haiku): chat + activity
+  messages: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    name: v.string(),
+    image: v.optional(v.string()),
+    text: v.string(), // 1-4000 chars, trimmed
+    mentions: v.array(v.string()), // Better Auth user ids of people @-mentioned
+    attachment: v.optional(v.object({
+      storageId: v.id("_storage"), name: v.string(), type: v.string(), size: v.number(),
+    })),
+    createdAt: v.number(),
+  }).index("by_project_created", ["projectId", "createdAt"]),
+
+  activity: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    name: v.string(),
+    kind: v.union(
+      v.literal("joined"), v.literal("left"), v.literal("approved"),
+      v.literal("file_created"), v.literal("file_changed"), v.literal("file_deleted"), v.literal("file_renamed"),
+      v.literal("run"), v.literal("snapshot"),
+    ),
+    detail: v.string(), // <= 300 chars
+    createdAt: v.number(),
+  }).index("by_project_created", ["projectId", "createdAt"]),
+
+  notifications: defineTable({
+    userId: v.string(),
+    projectId: v.id("projects"),
+    messageId: v.id("messages"),
+    read: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_user_read", ["userId", "read"]),
 });

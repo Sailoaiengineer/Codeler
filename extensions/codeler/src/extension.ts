@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { sample } from './sample';
 import { Auth } from './auth';
+import { startChat } from './chat';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
@@ -88,6 +89,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 
 export function activate(ctx: vscode.ExtensionContext) {
 	const auth = new Auth(ctx.secrets);
+	ctx.subscriptions.push(startChat(ctx, auth));
 	currentUserId = auth.me?.id;
 	ctx.subscriptions.push(startSync(ctx, auth));
 	const projectId = () => Boolean(vscode.workspace.getConfiguration('codeler').get<string>('projectId', '') && auth.me);

@@ -35,3 +35,7 @@ function richText(text) {
 function onCodelerMessage(fn) {
 	window.addEventListener('message', event => fn(event.data));
 }
+
+// Live rows from the extension carry their own initials and colour; sample rows are looked up by name.
+function personOf(row) { return row.initials ? row : person(row.who); }
+function sizeLabel(bytes) { return bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? Math.round(bytes / 1024) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB'; }
