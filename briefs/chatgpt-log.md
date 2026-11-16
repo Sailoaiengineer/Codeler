@@ -39,3 +39,28 @@ Not checked: a real Convex deployment and two-machine integration remain unteste
 - Still broken after the fix round, fixed by Claude: local edits were never queued (no `doc.on('update')`), the `updates` subscription re-subscribed on every callback (infinite loop), editor->doc applied stale offsets and could echo remote edits. Now: full-text diff via `applyEditorText` in logic.ts, queue on `doc.on('update')` for non-remote origins, resubscribe only when the version moves.
 - `logic.ts` imported `./safety.ts`: tests passed, but the compiled extension crashed on load (`Cannot find module './safety.ts'`), which would have broken every Codeler panel. Rule from now on: runtime files never import sibling files with a `.ts` extension; keep tested pure logic free of sibling imports, and check the compiled output loads (stub `vscode`, `require('./out/...')`).
 - Tests must exercise the real flow (load, typing, push, receive), not only helpers.
+
+## Task 2 — presence, cursors, follow mode
+
+Built:
+
+- Added authenticated Convex presence rows and query in `web/convex/presence.ts`, with project membership checks, sync-compatible path validation, bounded cursor/selection values, per-project/user-window ownership, and 30-second expiry.
+- Added extension presence heartbeats/subscription in `extensions/codeler/src/presence/`, including active/idle heartbeat limits, deterministic approved tag colors, real cursor name tags, Explorer file badges, and follow/stop-follow navigation.
+- Replaced sample panel behavior with live presence updates for Collaborators and Chat when a signed-in team project is active; sample preview remains when it is not. Real online members also feed the title bar.
+- Added pure tests for color assignment, throttle behavior, file decoration mapping, and follow state. Runtime imports use extensionless sibling paths.
+
+Verification:
+
+- `node --test extensions/codeler/src/**/*.test.ts`: 16 passed, 0 failed (PowerShell file expansion was used; Node emitted only the existing module-type warning).
+- Type-check passed with `--module esnext --moduleResolution bundler` against the repository VS Code declarations.
+- `bash scripts/sync-extension.sh` completed; `npm.cmd run gulp transpile-extension:codeler` completed with 0 compilation errors.
+- Compiled load check passed for `out/presence/logic.js`, `out/presence/index.js`, and `out/extension.js` using a stub `vscode` module.
+
+Not checked:
+
+- No live Convex deployment or two-client presence session was available, so server subscriptions, expiry, and real multi-user cursor rendering were not exercised end to end.
+- No full VSCodium UI run was performed.
+
+Claude should consider:
+
+- Wiring the existing project picker to set the active `codeler.projectId`; task 2 continues to use that temporary setting.

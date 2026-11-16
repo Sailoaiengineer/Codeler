@@ -36,8 +36,9 @@ const add = m => {
 };
 data.chat.forEach(add);
 msgs.scrollTop = msgs.scrollHeight;
-for (const p of data.people.filter(p => p.online))
-	document.getElementById('online').append(el('div', { class: 'person' }, avatar(p, true), p.name));
+const drawOnline = people => { const online = document.getElementById('online'); online.replaceChildren(...people.filter(p => p.online).map(p => el('div', { class: 'person' }, avatar(p, true), p.name))); };
+drawOnline(data.people);
+onCodelerMessage(m => { if (m.type === 'presence') drawOnline(m.people); });
 document.getElementById('form').addEventListener('submit', e => {
 	e.preventDefault();
 	vscode.postMessage({ type: 'notReady', text: 'Sending messages' });

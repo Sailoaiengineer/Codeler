@@ -31,3 +31,7 @@ function richText(text) {
 	}
 	return out;
 }
+
+function onCodelerMessage(fn) {
+	window.addEventListener('message', event => fn(event.data));
+}

@@ -79,4 +79,19 @@ export default defineSchema({
     update: v.bytes(),
     createdAt: v.number(),
   }).index("by_file_version", ["fileId", "version"]),
+
+  // ChatGPT: presence
+  presence: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    window: v.string(),
+    path: v.string(),
+    line: v.number(),
+    character: v.number(),
+    selection: v.object({
+      startLine: v.number(), startCharacter: v.number(),
+      endLine: v.number(), endCharacter: v.number(),
+    }),
+    lastSeen: v.number(),
+  }).index("by_project", ["projectId"]).index("by_project_window", ["projectId", "window"]),
 });

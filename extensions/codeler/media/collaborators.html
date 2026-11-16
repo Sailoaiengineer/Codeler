@@ -10,10 +10,12 @@
 <div class="list" id="list"></div>
 <script nonce="{{nonce}}" src="{{js}}"></script>
 <script nonce="{{nonce}}">
-for (const p of data.people)
-	document.getElementById('list').append(el('div', { class: 'item' }, avatar(p, p.online),
-		el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.online ? 'Online' : 'Offline')),
-		el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'notReady', text: 'Follow mode' }) }, 'Follow')));
+const draw = people => { const list = document.getElementById('list'); list.replaceChildren(...people.map(p => el('div', { class: 'item' }, avatar(p, p.online),
+		el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.file ? `${p.online ? 'Online' : 'Offline'} · ${p.file}:${(p.cursorLine ?? 0)}` : (p.online ? 'Online' : 'Offline'))),
+		el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'follow', userId: p.userId }) }, 'Follow'),
+		el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'stopFollowing' }) }, 'Stop')))); };
+draw(data.people);
+onCodelerMessage(m => { if (m.type === 'presence') draw(m.people); });
 </script>
 </body>
 </html>
