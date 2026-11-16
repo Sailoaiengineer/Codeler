@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<link rel="stylesheet" href="{{css}}">
+</head>
+<body>
+<script type="application/json" id="data">{{data}}</script>
+<div class="list" id="list" role="log"></div>
+<script nonce="{{nonce}}" src="{{js}}"></script>
+<script nonce="{{nonce}}">
+for (const a of data.activity) {
+	const p = person(a.who);
+	document.getElementById('list').append(el('div', { class: 'item' }, avatar(p),
+		el('div', { class: 'grow' }, el('div', {}, el('b', {}, p.name), ' ', a.text), el('div', { class: 'sub' }, a.time))));
+}
+</script>
+</body>
+</html>

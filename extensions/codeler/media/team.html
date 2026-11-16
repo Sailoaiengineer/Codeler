@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<link rel="stylesheet" href="{{css}}">
+</head>
+<body>
+<script type="application/json" id="data">{{data}}</script>
+<div class="page">
+<form class="card" id="form" novalidate>
+	<div class="card-body">
+		<div class="head">
+			<svg width="54" height="42" viewBox="0 0 54 42" fill="#4aa8ff" aria-hidden="true"><circle cx="19" cy="10" r="9"/><path d="M1 38c0-10 8-16 18-16s18 6 18 16v2H1z"/><circle cx="40" cy="12" r="7" opacity=".85"/><path d="M33 23.5c2-1 4.3-1.5 7-1.5 8 0 14 5 14 13v5H40v-2c0-6-2.5-11-7-14.5z" opacity=".85"/></svg>
+			<div>
+				<h1>Create your team</h1>
+				<p>Build together, ship faster. Create a team to collaborate with your teammates on shared projects.</p>
+			</div>
+		</div>
+
+		<div class="field">
+			<label for="name">Team name</label>
+			<input class="input" id="name" placeholder="e.g. Aurora Devs" maxlength="60" required>
+		</div>
+		<div class="field">
+			<label for="desc">Team description</label>
+			<textarea class="input" id="desc" placeholder="Tell your teammates what your team is working on..." maxlength="500"></textarea>
+		</div>
+		<div class="field">
+			<label for="pass">Team password</label>
+			<p class="hint">Teammates need this to ask to join. You still approve each one.</p>
+			<input class="input" id="pass" type="password" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
+		</div>
+		<div class="field">
+			<span class="label">Team avatar / icon <small>(optional)</small></span>
+			<div class="avatar-pick">
+				<label class="drop" for="file" aria-label="Choose team image">
+					<svg id="cam" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c9d6ea" stroke-width="1.6" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+				</label>
+				<label class="btn-soft" for="file">Choose image</label>
+				<input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
+			</div>
+		</div>
+
+		<div class="field last">
+			<span class="label">Invite teammates</span>
+			<p class="hint">Add teammates by their email address. You can always invite more later.</p>
+			<div class="invite">
+				<input class="input" id="email" type="email" placeholder="name@company.com" aria-label="Teammate email">
+				<div class="select"><select class="input" id="role" aria-label="Role"><option>Member</option><option>Admin</option></select></div>
+				<button type="button" class="btn-outline" id="add"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8"><path d="M7 1v12M1 7h12"/></svg>Add another</button>
+			</div>
+			<div class="error" id="err" role="alert"></div>
+			<div class="invites" id="invites"></div>
+		</div>
+	</div>
+	<div class="foot">
+		<button type="button" class="btn-cancel" id="cancel">Cancel</button>
+		<button class="btn-primary">Create team</button>
+	</div>
+</form>
+</div>
+<script nonce="{{nonce}}" src="{{js}}"></script>
+<script nonce="{{nonce}}">
+const invites = [];
+const $ = id => document.getElementById(id);
+const err = $('err');
+const okEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+
+function drawInvites() {
+	$('invites').replaceChildren(...invites.map((v, i) => el('div', { class: 'invitee' },
+		el('div', { class: 'avatar' }, v.email.split('@')[0].split(/[._-]/).map(s => s[0] || '').join('').slice(0, 2).toUpperCase()),
+		el('div', { class: 'grow' }, el('div', {}, v.email), el('div', { class: 'sub' }, v.role)),
+		el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Remove ' + v.email, onclick: () => { invites.splice(i, 1); drawInvites(); } },
+			Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), {}))
+	)));
+	// close "x" icons (built after so SVG namespace is right)
+	document.querySelectorAll('.invitee .icon-btn svg').forEach(s => {
+		s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.setAttribute('viewBox', '0 0 16 16');
+		s.setAttribute('stroke', '#c9d6ea'); s.setAttribute('stroke-width', '1.6');
+		s.innerHTML = '<path d="M3 3l10 10M13 3L3 13"/>';
+	});
+}
+
+$('add').addEventListener('click', () => {
+	const email = $('email').value.trim().toLowerCase();
+	err.textContent = '';
+	if (!okEmail(email)) return err.textContent = 'Enter a valid email address.';
+	if (invites.some(v => v.email === email)) return err.textContent = 'Already added.';
+	invites.push({ email, role: $('role').value });
+	$('email').value = '';
+	drawInvites();
+});
+$('email').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('add').click(); } });
+
+$('file').addEventListener('change', () => {
+	const f = $('file').files[0];
+	if (!f) return;
+	if (f.size > 1024 * 1024) { err.textContent = 'Image must be under 1 MB.'; return; }
+	const r = new FileReader();
+	r.onload = () => document.querySelector('.drop').replaceChildren(el('img', { src: r.result, alt: 'Team image' }));
+	r.readAsDataURL(f);
+});
+
+$('cancel').addEventListener('click', () => vscode.postMessage({ type: 'close' }));
+$('form').addEventListener('submit', e => {
+	e.preventDefault();
+	err.textContent = '';
+	if (!$('name').value.trim()) return $('name').focus(), err.textContent = 'Give your team a name.';
+	if ($('pass').value.length < 8) return $('pass').focus(), err.textContent = 'The team password needs at least 8 characters.';
+	vscode.postMessage({ type: 'notReady', text: 'Creating a team' });
+});
+</script>
+</body>
+</html>

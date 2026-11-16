@@ -1,0 +1,389 @@
+diff --git a/build/gulpfile.extensions.ts b/build/gulpfile.extensions.ts
+index bc1f9fba..58e27ff1 100644
+--- a/build/gulpfile.extensions.ts
++++ b/build/gulpfile.extensions.ts
+@@ -84,6 +84,7 @@ const compilations = [
+ 	'extensions/references-view/tsconfig.json',
+ 	'extensions/search-result/tsconfig.json',
+ 	'extensions/simple-browser/tsconfig.json',
++	'extensions/codeler/tsconfig.json', // Codeler built-in
+ 	'extensions/tunnel-forwarding/tsconfig.json',
+ 	'extensions/typescript-language-features/web/tsconfig.json',
+ 	'extensions/typescript-language-features/tsconfig.json',
+diff --git a/src/vs/platform/window/common/window.ts b/src/vs/platform/window/common/window.ts
+index 7e31cd31..dec075ac 100644
+--- a/src/vs/platform/window/common/window.ts
++++ b/src/vs/platform/window/common/window.ts
+@@ -383,7 +383,7 @@ export function getWindowControlsStyle(configurationService: IConfigurationServi
+ 	return WindowControlsStyle.NATIVE; // default to native on all OS
+ }
+ 
+-export const DEFAULT_CUSTOM_TITLEBAR_HEIGHT = 35; // includes space for command center
++export const DEFAULT_CUSTOM_TITLEBAR_HEIGHT = 48; // Codeler: taller bar to fit team buttons (was 35)
+ 
+ /** Centers macOS traffic lights vertically, optionally keeping their horizontal inset independent of height. */
+ export function getMacOSWindowControlsPosition(height: number, osVersion: string, horizontalInset?: number): IPoint | null {
+diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
+index e8edbe1b..e0aa6df6 100644
+--- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
++++ b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
+@@ -41,6 +41,17 @@ import { IWorkbenchEnvironmentService } from '../../../services/environment/comm
+ import { IViewsService } from '../../../services/views/common/viewsService.js';
+ import { SwitchCompositeViewAction } from '../compositeBarActions.js';
+ import { IHostService } from '../../../services/host/browser/host.js';
++import { Emitter } from '../../../../base/common/event.js';
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import './media/codeler.css';
++
++// Codeler: the built-in extension expands the activity bar while the Team page is open.
++let codelerExpanded = false;
++const onDidChangeCodelerExpanded = new Emitter<boolean>();
++CommandsRegistry.registerCommand('_codeler.activitybar.setExpanded', (_accessor, expanded: unknown) => {
++	codelerExpanded = expanded === true;
++	onDidChangeCodelerExpanded.fire(codelerExpanded);
++});
+ 
+ export class ActivitybarPart extends Part {
+ 
+@@ -105,6 +116,9 @@ export class ActivitybarPart extends Part {
+ 
+ 	/** The intrinsic activity bar width (excludes any floating gutter). */
+ 	private get baseWidth(): number {
++		if (this._codelerExpanded) {
++			return ActivitybarPart.CODELER_EXPANDED_WIDTH;
++		}
+ 		if (this.layoutService.isFloatingPanelsEnabled()) {
+ 			if (this._isCompact) {
+ 				return ActivitybarPart.FLOATING_COMPACT_ACTIVITYBAR_WIDTH;
+@@ -114,6 +128,18 @@ export class ActivitybarPart extends Part {
+ 		return this._isCompact ? ActivitybarPart.COMPACT_ACTIVITYBAR_WIDTH : ActivitybarPart.ACTIVITYBAR_WIDTH;
+ 	}
+ 
++	// Codeler: labelled, wide activity bar (reference image 3), switched by `_codeler.activitybar.setExpanded`
++	static readonly CODELER_EXPANDED_WIDTH = 240;
++	private _codelerExpanded = codelerExpanded;
++	private setCodelerExpanded(expanded: boolean): void {
++		if (this._codelerExpanded === expanded) {
++			return;
++		}
++		this._codelerExpanded = expanded;
++		this.updateCompactStyle();
++		this._onDidChange.fire(undefined);
++	}
++
+ 	/** The action (item) height that drives visible item sizing. */
+ 	private get actionHeight(): number {
+ 		if (this._isCompact) {
+@@ -191,6 +217,7 @@ export class ActivitybarPart extends Part {
+ 		super(Parts.ACTIVITYBAR_PART, { hasTitle: false }, themeService, storageService, layoutService);
+ 
+ 		this._isCompact = this.configurationService.getValue<boolean>(LayoutSettings.ACTIVITY_BAR_COMPACT) ?? false;
++		this._register(onDidChangeCodelerExpanded.event(expanded => this.setCodelerExpanded(expanded)));
+ 
+ 		this._register(this.configurationService.onDidChangeConfiguration(e => {
+ 			if (e.affectsConfiguration(LayoutSettings.ACTIVITY_BAR_COMPACT)) {
+@@ -235,6 +262,7 @@ export class ActivitybarPart extends Part {
+ 	private updateCompactStyle(): void {
+ 		if (this.element) {
+ 			this.element.classList.toggle('compact', this._isCompact);
++			this.element.classList.toggle('codeler-expanded', this._codelerExpanded);
+ 			// Mirrored on the workbench root for floatingPanels.css
+ 			this.layoutService.mainContainer.classList.toggle('activitybar-compact', this._isCompact);
+ 			this.element.style.setProperty('--activity-bar-width', `${this.baseWidth}px`);
+diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
+index fe7bce2f..f5187264 100644
+--- a/src/vs/workbench/browser/parts/compositeBarActions.ts
++++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
+@@ -392,6 +392,13 @@ export class CompositeBarActionViewItem extends BaseActionViewItem {
+ 
+ 	protected override updateLabel(): void {
+ 		this.label.className = 'action-label';
++		// Codeler: label shown beside the icon when the activity bar is expanded (hidden otherwise by CSS)
++		let codelerLabel = this.container.querySelector<HTMLElement>(':scope > .codeler-label');
++		if (!codelerLabel) {
++			codelerLabel = append(this.container, $('span.codeler-label'));
++		}
++		codelerLabel.textContent = this.action.label;
++		this.container.dataset.codelerLabel = this.action.label;
+ 
+ 		if (this.compositeBarActionItem.classNames) {
+ 			this.label.classList.add(...this.compositeBarActionItem.classNames);
+diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+index bfc8839c..3ec78447 100644
+--- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
++++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+@@ -53,7 +53,8 @@ import { IView } from '../../../../base/browser/ui/grid/grid.js';
+ import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
+ import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
+ import { IHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegate.js';
+-import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { installCodelerTitlebar } from './codelerTitlebar.js';
+ import { safeIntl } from '../../../../base/common/date.js';
+ import { IsCompactTitleBarContext, TitleBarVisibleContext } from '../../../common/contextkeys.js';
+ import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
+@@ -531,6 +532,11 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+ 			this.updateToolBarDisposable.add(updateToolBar.onDidChangeMenuItems(() => this.titleBarToolBarOverflowScheduler.schedule()));
+ 		}
+ 
++		// Codeler: project/branch pickers (left) and team buttons (right)
++		if (!this.isAuxiliary && hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
++			this._register(installCodelerTitlebar(this.leftContent, this.rightContent, this.instantiationService.invokeFunction(accessor => accessor.get(ICommandService))));
++		}
++
+ 		// Create Toolbar Actions
+ 		if (hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
+ 			this.actionToolBarElement = append(this.rightContent, $('div.action-toolbar-container'));
+diff --git a/src/vs/workbench/browser/parts/activitybar/media/codeler.css b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
+new file mode 100644
+index 00000000..6e0edff9
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
+@@ -0,0 +1,39 @@
++/* Codeler: expanded activity bar with labels (reference image 3) */
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item {
++	width: auto;
++	margin: 2px 8px;
++	border-radius: 6px;
++	display: flex;
++	align-items: center;
++}
++.monaco-workbench .activitybar .codeler-label { display: none; }
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item > .codeler-label {
++	display: block;
++	margin-left: 2px;
++	font-size: 15px;
++	color: var(--vscode-activityBar-inactiveForeground);
++	white-space: nowrap;
++	pointer-events: none;
++}
++/* The expanded bar only shows while the Team page is open, so Team is the selected row (the side bar itself is hidden, which clears `.checked`). */
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item[data-codeler-label="Team"],
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item.checked {
++	background: #134779;
++}
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item.checked > .codeler-label,
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item:hover > .codeler-label {
++	color: var(--vscode-activityBar-foreground);
++}
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item:hover:not(.checked) {
++	background: rgba(255, 255, 255, 0.05);
++}
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .active-item-indicator {
++	display: none;
++}
++
++/* Icon keeps its 48px box on the left; the label follows it */
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .actions-container { align-items: stretch; }
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item { justify-content: flex-start; overflow: visible; }
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .action-label { flex: none; width: 40px !important; }
++.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .badge { left: 22px; }
++.monaco-workbench .activitybar.codeler-expanded .menubar { width: 48px; }
+diff --git a/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts b/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts
+new file mode 100644
+index 00000000..b425599f
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts
+@@ -0,0 +1,127 @@
++/*---------------------------------------------------------------------------------------------
++ *  Codeler: project/branch pickers on the left of the title bar and avatars, Share, Run/Save
++ *  and the bell on the right. The Codeler built-in extension owns the data and pushes it here
++ *  with the `_codeler.titlebar.setState` command; clicks run the extension's commands.
++ *--------------------------------------------------------------------------------------------*/
++
++import './media/codeler.css';
++import { $, append, addDisposableListener, EventType, reset } from '../../../../base/browser/dom.js';
++import { Emitter } from '../../../../base/common/event.js';
++import { DisposableStore } from '../../../../base/common/lifecycle.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { ThemeIcon } from '../../../../base/common/themables.js';
++import { Codicon } from '../../../../base/common/codicons.js';
++import { renderIcon } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
++
++export interface ICodelerPerson { name: string; initials: string; color: string; photo?: string }
++export interface ICodelerTitlebarState {
++	mode: 'team' | 'solo';
++	project: string;
++	branch: string;
++	people: ICodelerPerson[];
++	unread: number;
++	dirty: boolean;
++	account?: { name: string; photo?: string };
++	/** A full-window page (image 3: Team) shows only the project picker. */
++	page?: 'team';
++}
++
++const MAX_AVATARS = 3;
++let state: ICodelerTitlebarState | undefined;
++const onDidChange = new Emitter<void>();
++
++const str = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : '';
++const color = (v: unknown) => typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v) ? v : '#2684f5';
++
++// Extensions can call this, so treat the payload as untrusted.
++CommandsRegistry.registerCommand('_codeler.titlebar.setState', (_accessor, raw: Partial<ICodelerTitlebarState> | undefined) => {
++	if (!raw || typeof raw !== 'object') {
++		state = undefined;
++	} else {
++		state = {
++			mode: raw.mode === 'team' ? 'team' : 'solo',
++			project: str(raw.project, 80),
++			branch: str(raw.branch, 60),
++			people: (Array.isArray(raw.people) ? raw.people : []).slice(0, 200).map(p => ({
++				name: str(p?.name, 60), initials: str(p?.initials, 2), color: color(p?.color),
++				photo: typeof p?.photo === 'string' && /^https:\/\//.test(p.photo) ? p.photo : undefined,
++			})),
++			unread: Math.max(0, Math.min(999, Number(raw.unread) || 0)),
++			dirty: !!raw.dirty,
++			page: raw.page === 'team' ? 'team' : undefined,
++			account: raw.account && typeof raw.account === 'object' ? {
++				name: str(raw.account.name, 60),
++				photo: typeof raw.account.photo === 'string' && /^https:\/\//.test(raw.account.photo) ? raw.account.photo : undefined,
++			} : undefined,
++		};
++	}
++	onDidChange.fire();
++});
++
++export function installCodelerTitlebar(left: HTMLElement, right: HTMLElement, commands: ICommandService): DisposableStore {
++	const store = new DisposableStore();
++	const leftSlot = append(left, $('div.codeler-title-left'));
++	const rightSlot = append(right, $('div.codeler-title-right'));
++	const run = (id: string) => commands.executeCommand(id);
++
++	const button = (cls: string, label: string, icon: ThemeIcon | undefined, cmd: string, text?: string) => {
++		const b = $(`button.${cls}`, { type: 'button', 'aria-label': label, title: label });
++		if (icon) { b.append(renderIcon(icon)); }
++		if (text) { b.append($('span', undefined, text)); }
++		store.add(addDisposableListener(b, EventType.CLICK, () => run(cmd)));
++		return b;
++	};
++	const picker = (icon: ThemeIcon | undefined, text: string, label: string, cmd: string) => {
++		const b = button('codeler-picker', label, icon, cmd, text);
++		b.append(renderIcon(Codicon.chevronDown));
++		return b;
++	};
++
++	const render = () => {
++		if (!state) {
++			reset(leftSlot);
++			reset(rightSlot);
++			return;
++		}
++		const project = picker(undefined, state.project || 'Open project', 'Switch project', 'codeler.pickProject');
++		if (state.page) {
++			reset(leftSlot, project);
++			reset(rightSlot);
++			return;
++		}
++		reset(leftSlot, project, picker(Codicon.gitBranch, state.branch || 'main', 'Version history', 'codeler.pickBranch'));
++
++		const items: HTMLElement[] = [];
++		if (state.mode === 'team' && state.people.length) {
++			const stack = button('codeler-avatars', `${state.people.length} collaborators`, undefined, 'workbench.view.extension.codeler-collaborators');
++			for (const p of state.people.slice(0, MAX_AVATARS)) {
++				const a = append(stack, $('span.codeler-avatar', { title: p.name }));
++				a.style.backgroundColor = p.color;
++				if (p.photo) { append(a, $('img', { src: p.photo, alt: '' })); } else { a.textContent = p.initials; }
++			}
++			if (state.people.length > MAX_AVATARS) { append(stack, $('span.codeler-avatar.more', undefined, `+${state.people.length - MAX_AVATARS}`)); }
++			items.push(stack, button('codeler-btn.green', 'Share preview', Codicon.link, 'codeler.share', 'Share'));
++		}
++		const runBtn = button('codeler-btn.green', 'Run', Codicon.play, 'codeler.run', 'Run');
++		const gear = button('codeler-icon', 'Settings', Codicon.settingsGear, 'workbench.action.openSettings');
++		if (state.mode === 'solo') {
++			// image 2 order: gear, Save, Run
++			items.push(gear, button('codeler-btn.outline', 'Save', Codicon.save, 'workbench.action.files.save', 'Save'), runBtn);
++		} else {
++			// image 1 order: avatars, Share, Run, gear, bell, account
++			items.push(runBtn, gear);
++			const bell = button('codeler-icon', state.unread ? `${state.unread} notifications` : 'Notifications', Codicon.bell, 'codeler.notifications');
++			if (state.unread) { append(bell, $('span.codeler-dot')); }
++			// Account: your Google photo once signed in, otherwise a sign-in button. Not in image 2 (solo), so team only.
++			const who = state.account;
++			const account = button('codeler-icon.codeler-account', who ? `Signed in as ${who.name}` : 'Sign in', who?.photo ? undefined : Codicon.account, 'codeler.account');
++			if (who?.photo) { append(account, $('img', { src: who.photo, alt: '', referrerpolicy: 'no-referrer' })); }
++			items.push(bell, account);
++		}
++		reset(rightSlot, ...items);
++	};
++
++	render();
++	store.add(onDidChange.event(render));
++	return store;
++}
+diff --git a/src/vs/workbench/browser/parts/titlebar/media/codeler.css b/src/vs/workbench/browser/parts/titlebar/media/codeler.css
+new file mode 100644
+index 00000000..b0f49427
+--- /dev/null
++++ b/src/vs/workbench/browser/parts/titlebar/media/codeler.css
+@@ -0,0 +1,69 @@
++/* Codeler title bar items (sizes measured from the reference screenshots, scaled to a 48px bar) */
++.monaco-workbench .part.titlebar .codeler-title-left,
++.monaco-workbench .part.titlebar .codeler-title-right {
++	display: flex;
++	align-items: center;
++	height: 100%;
++	-webkit-app-region: no-drag;
++}
++.monaco-workbench .part.titlebar .codeler-title-left { gap: 28px; }
++.monaco-workbench .part.titlebar .codeler-title-right { gap: 12px; margin-right: 10px; }
++
++.monaco-workbench .part.titlebar .codeler-title-left button,
++.monaco-workbench .part.titlebar .codeler-title-right button {
++	display: inline-flex;
++	align-items: center;
++	gap: 7px;
++	border: 0;
++	background: none;
++	color: var(--vscode-titleBar-activeForeground);
++	font: inherit;
++	cursor: pointer;
++	-webkit-app-region: no-drag;
++}
++.monaco-workbench .part.titlebar .codeler-title-left button:focus-visible,
++.monaco-workbench .part.titlebar .codeler-title-right button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
++
++.monaco-workbench .part.titlebar .codeler-picker { font-size: 14px; padding: 4px 6px; border-radius: 6px; }
++.monaco-workbench .part.titlebar .codeler-picker:first-child { font-weight: 600; font-size: 15px; }
++.monaco-workbench .part.titlebar .codeler-picker:hover { background: rgba(255, 255, 255, 0.06); }
++.monaco-workbench .part.titlebar .codeler-picker .codicon-chevron-down { font-size: 13px; opacity: .8; }
++
++.monaco-workbench .part.titlebar .codeler-avatars { padding: 0 6px 0 0; }
++.monaco-workbench .part.titlebar .codeler-avatar {
++	width: 30px; height: 30px; border-radius: 50%;
++	display: inline-grid; place-items: center; overflow: hidden;
++	font-size: 12px; font-weight: 600; color: #fff;
++	box-shadow: 0 0 0 2px var(--vscode-titleBar-activeBackground);
++	margin-left: -7px;
++}
++.monaco-workbench .part.titlebar .codeler-avatar:first-child { margin-left: 0; }
++.monaco-workbench .part.titlebar .codeler-avatar img { width: 100%; height: 100%; object-fit: cover; }
++.monaco-workbench .part.titlebar .codeler-avatar.more { background: #1b3453; color: #c9d6ea; }
++
++.monaco-workbench .part.titlebar .codeler-btn {
++	height: 32px; padding: 0 15px; border-radius: 6px;
++	font-size: 14px; font-weight: 600;
++}
++.monaco-workbench .part.titlebar .codeler-btn.green { background: #2fb85a; color: #fff; }
++.monaco-workbench .part.titlebar .codeler-btn.green:hover { background: #36c865; }
++.monaco-workbench .part.titlebar .codeler-btn.outline { background: #0e2a4a; box-shadow: inset 0 0 0 1px #4f74a3; }
++.monaco-workbench .part.titlebar .codeler-btn.outline:hover { background: #133459; }
++.monaco-workbench .part.titlebar .codeler-btn .codicon { font-size: 15px; }
++
++.monaco-workbench .part.titlebar .codeler-icon { position: relative; width: 32px; height: 32px; justify-content: center; border-radius: 6px; }
++.monaco-workbench .part.titlebar .codeler-icon:hover { background: rgba(255, 255, 255, 0.06); }
++.monaco-workbench .part.titlebar .codeler-icon .codicon { font-size: 18px; }
++.monaco-workbench .part.titlebar .codeler-dot {
++	position: absolute; top: 6px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
++	background: #2684f5; box-shadow: 0 0 0 2px var(--vscode-titleBar-activeBackground);
++}
++
++/* the window title text is not used in Codeler; the project picker replaces it */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title { display: none; }
++.monaco-workbench .part.titlebar .codeler-account img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
++
++/* Logo first, centred over the 48px activity bar (image 1), then the project and branch pickers */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .codeler-title-left { order: 2; margin-left: 10px; }
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { width: 48px; }
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon:not(.codicon) { background-size: 28px; }

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<link rel="stylesheet" href="{{css}}">
+</head>
+<body>
+<script type="application/json" id="data">{{data}}</script>
+<div class="chat">
+	<div class="msgs" id="msgs" role="log" aria-live="polite"></div>
+	<form class="composer" id="form">
+		<div class="box">
+			<input id="text" placeholder="Type a message..." aria-label="Message" autocomplete="off">
+			<button type="button" class="icon-btn" aria-label="Emoji" id="emoji">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg>
+			</button>
+		</div>
+		<button class="send" aria-label="Send">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 4l17 8-17 8 3-8-3-8z"/><path d="M7 12h14"/></svg>
+		</button>
+	</form>
+	<section class="online">
+		<h3>Currently online</h3>
+		<div class="row" id="online"></div>
+	</section>
+</div>
+<script nonce="{{nonce}}" src="{{js}}"></script>
+<script nonce="{{nonce}}">
+const msgs = document.getElementById('msgs');
+const add = m => {
+	const p = person(m.who);
+	msgs.append(el('div', { class: 'msg' }, avatar(p),
+		el('div', {}, el('div', {}, el('span', { class: 'who' }, p.name), el('span', { class: 'time' }, m.time)),
+			el('div', { class: 'text' }, richText(m.text)))));
+};
+data.chat.forEach(add);
+msgs.scrollTop = msgs.scrollHeight;
+for (const p of data.people.filter(p => p.online))
+	document.getElementById('online').append(el('div', { class: 'person' }, avatar(p, true), p.name));
+document.getElementById('form').addEventListener('submit', e => {
+	e.preventDefault();
+	vscode.postMessage({ type: 'notReady', text: 'Sending messages' });
+});
+document.getElementById('emoji').addEventListener('click', () => vscode.postMessage({ type: 'notReady', text: 'The emoji picker' }));
+</script>
+</body>
+</html>

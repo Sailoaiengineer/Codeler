@@ -1,0 +1,28 @@
+/* Colours from the Codeler Dark theme (reference image 3) */
+:root {
+  --page: #051931; --card: #071d35; --line: #11273f; --field: #08223d; --field-line: #1b3a5b;
+  --text: #e8f1ff; --muted: #a9bad3; --blue: #2ea8f6; --blue-hover: #45b3f8; --focus: #2684f5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--page); color: var(--text); }
+body { font: 16px/1.5 Inter, 'Segoe UI', system-ui, sans-serif; }
+.page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.card { width: 100%; max-width: 440px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 32px; display: flex; flex-direction: column; gap: 14px; }
+h1 { margin: 6px 0 0; font-size: 26px; font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+label { font-weight: 600; display: block; margin-bottom: 8px; }
+.input { width: 100%; background: var(--field); border: 1px solid var(--field-line); border-radius: 6px; padding: 10px 14px; color: var(--text); font: inherit; letter-spacing: 2px; margin-bottom: 14px; }
+.input:focus { outline: none; border-color: var(--focus); }
+.code { font: 600 28px/1 'JetBrains Mono', Consolas, monospace; letter-spacing: 4px; text-align: center; padding: 18px; background: var(--field); border: 1px solid var(--field-line); border-radius: 6px; }
+button { font: inherit; cursor: pointer; border-radius: 6px; padding: 10px 20px; }
+button:disabled { opacity: .6; cursor: default; }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.primary { background: var(--blue); color: #fff; border: 0; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.primary:hover:not(:disabled) { background: var(--blue-hover); }
+.ghost { background: none; color: var(--text); border: 1px solid #2c4a6b; }
+.wide { width: 100%; }
+.row { display: flex; gap: 12px; justify-content: flex-end; }
+.link { background: none; border: 0; padding: 0; color: #6fc0ff; align-self: flex-start; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

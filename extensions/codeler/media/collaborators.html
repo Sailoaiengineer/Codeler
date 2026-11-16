@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<link rel="stylesheet" href="{{css}}">
+</head>
+<body>
+<script type="application/json" id="data">{{data}}</script>
+<div class="list" id="list"></div>
+<script nonce="{{nonce}}" src="{{js}}"></script>
+<script nonce="{{nonce}}">
+for (const p of data.people)
+	document.getElementById('list').append(el('div', { class: 'item' }, avatar(p, p.online),
+		el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.online ? 'Online' : 'Offline')),
+		el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'notReady', text: 'Follow mode' }) }, 'Follow')));
+</script>
+</body>
+</html>

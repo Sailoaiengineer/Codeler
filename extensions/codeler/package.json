@@ -1,0 +1,202 @@
+{
+  "name": "codeler",
+  "displayName": "Codeler",
+  "description": "Teams, live editing and chat for Codeler.",
+  "version": "0.1.0",
+  "publisher": "codeler",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "main": "./out/extension",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Codeler Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/codeler-dark.json"
+      }
+    ],
+    "configurationDefaults": {
+      "workbench.colorTheme": "Codeler Dark",
+      "editor.fontFamily": "'JetBrains Mono', Consolas, 'Courier New', monospace",
+      "editor.fontSize": 15,
+      "editor.lineHeight": 25,
+      "editor.minimap.enabled": false,
+      "editor.renderLineHighlight": "none",
+      "workbench.tree.indent": 14,
+      "workbench.editor.tabSizing": "fit",
+      "window.commandCenter": false,
+      "workbench.layoutControl.enabled": false,
+      "git.enabled": false,
+      "chat.disableAIFeatures": true,
+      "breadcrumbs.enabled": false,
+      "workbench.experimental.modernUI": false
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeler-team",
+          "title": "Team",
+          "icon": "$(organization)"
+        },
+        {
+          "id": "codeler-workspaces",
+          "title": "Workspaces",
+          "icon": "$(package)"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "codeler-chat",
+          "title": "Chat",
+          "icon": "$(comment)"
+        },
+        {
+          "id": "codeler-activity",
+          "title": "Activity",
+          "icon": "$(zap)"
+        },
+        {
+          "id": "codeler-collaborators",
+          "title": "Collaborators",
+          "icon": "$(person-add)"
+        }
+      ]
+    },
+    "views": {
+      "codeler-team": [
+        {
+          "type": "webview",
+          "id": "codeler.team",
+          "name": "Team"
+        }
+      ],
+      "codeler-chat": [
+        {
+          "type": "webview",
+          "id": "codeler.chat",
+          "name": "Chat"
+        }
+      ],
+      "codeler-activity": [
+        {
+          "type": "webview",
+          "id": "codeler.activity",
+          "name": "Activity"
+        }
+      ],
+      "codeler-collaborators": [
+        {
+          "type": "webview",
+          "id": "codeler.collaborators",
+          "name": "Collaborators"
+        }
+      ],
+      "codeler-workspaces": [
+        {
+          "type": "webview",
+          "id": "codeler.workspaces",
+          "name": "Workspaces"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codeler.createTeam",
+        "title": "Create your team",
+        "category": "Codeler",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "codeler.share",
+        "title": "Share preview",
+        "category": "Codeler",
+        "icon": "$(link)"
+      },
+      {
+        "command": "codeler.run",
+        "title": "Run",
+        "category": "Codeler",
+        "icon": "$(play)"
+      },
+      {
+        "command": "codeler.toggleSampleCursors",
+        "title": "Show sample teammate cursors (layout preview)",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.switchLayoutPreview",
+        "title": "Switch layout preview (team / solo)",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.pickProject",
+        "title": "Switch project",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.pickBranch",
+        "title": "Version history",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.notifications",
+        "title": "Notifications",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.account",
+        "title": "Your account",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.signIn",
+        "title": "Sign in with Google",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.signOut",
+        "title": "Sign out",
+        "category": "Codeler"
+      }
+    ],
+    "configuration": {
+      "title": "Codeler",
+      "properties": {
+        "codeler.layoutPreview": {
+          "type": "string",
+          "enum": [
+            "team",
+            "solo"
+          ],
+          "default": "team",
+          "description": "Temporary: which reference layout to show with sample data until login and teams are connected."
+        },
+        "codeler.siteUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "Address of the Codeler sign-in site."
+        },
+        "codeler.convexUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Address of the Codeler Convex backend (https://<deployment>.convex.cloud)."
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "codeler.createTeam",
+          "when": "view == codeler.workspaces",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {}
+}

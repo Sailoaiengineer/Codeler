@@ -1,0 +1,8 @@
+vscodium/
+node_modules/
+.next/
+web/convex/_generated/
+*.log
+.env*.local
+out/
+dist/
