@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { allowedVerificationUrl, pollDeviceToken, storeSessionToken } from './auth-logic';
 
 // Desktop sign-in (OAuth device flow through Better Auth). The session token lives in the OS keychain
 // via SecretStorage; it never goes into settings or files.
@@ -46,8 +47,8 @@ export class Auth {
 		let interval = Math.max(start.data.interval || 5, 5) * 1000;
 
 		// Only open our own site, whatever the server says.
+		if (!allowedVerificationUrl(verification_uri_complete, siteUrl())) { vscode.window.showErrorMessage('Codeler sign-in returned an unexpected address.'); return; }
 		const page = new URL(verification_uri_complete, siteUrl());
-		if (page.origin !== new URL(siteUrl()).origin) { vscode.window.showErrorMessage('Codeler sign-in returned an unexpected address.'); return; }
 		await vscode.env.openExternal(vscode.Uri.parse(page.toString()));
 
 		const token = await vscode.window.withProgress({
@@ -55,26 +56,18 @@ export class Auth {
 			title: `Sign in to Codeler: check that your browser shows ${user_code}, then click Allow.`,
 			cancellable: true,
 		}, async (_p, cancel) => {
-			const deadline = Date.now() + expires_in * 1000;
-			while (!cancel.isCancellationRequested && Date.now() < deadline) {
-				await new Promise(r => setTimeout(r, interval));
-				let res;
-				try {
-					res = await post<{ access_token?: string; error?: string }>('/api/auth/device/token', {
+			const result = await pollDeviceToken(async () => {
+				const res = await post<{ access_token?: string; error?: string }>('/api/auth/device/token', {
 						grant_type: 'urn:ietf:params:oauth:grant-type:device_code', device_code, client_id: CLIENT_ID,
 					});
-				} catch { continue; } // offline for a moment: keep waiting
-				if (res.ok && res.data.access_token) return res.data.access_token;
-				const err = res.data.error;
-				if (err === 'slow_down') interval += 5000;
-				else if (err === 'access_denied') { vscode.window.showWarningMessage('Sign-in was denied in the browser.'); return undefined; }
-				else if (err === 'expired_token' || err === 'invalid_grant') break;
-			}
-			if (!cancel.isCancellationRequested) vscode.window.showWarningMessage('The sign-in code expired. Try again.');
-			return undefined;
+				return { ok: res.ok, status: res.status, ...res.data };
+			}, { intervalMs: interval, expiresInMs: expires_in * 1000, cancelled: () => cancel.isCancellationRequested });
+			if (result.reason === 'access_denied') vscode.window.showWarningMessage('Sign-in was denied in the browser.');
+			else if (result.reason === 'expired') vscode.window.showWarningMessage('The sign-in code expired. Try again.');
+			return result.token;
 		});
 		if (!token) return;
-		await this.secrets.store(SECRET_KEY, token);
+		await storeSessionToken(this.secrets, token);
 		await this.refreshMe();
 		if (this.me) vscode.window.showInformationMessage(`Signed in as ${this.me.email}.`);
 	}

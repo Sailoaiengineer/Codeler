@@ -56,8 +56,19 @@
 	</div>
 	<div class="foot">
 		<button type="button" class="btn-cancel" id="cancel">Cancel</button>
-		<button class="btn-primary">Create team</button>
+		<button class="btn-primary" id="submit">Create team</button>
 	</div>
+</form>
+<form class="card" id="join-form" novalidate style="margin-top:24px">
+	<div class="card-body">
+		<h2>Join a team</h2>
+		<p>Enter the join code and password from a team owner or admin.</p>
+		<div class="field"><label for="join-code">Join code</label><input class="input" id="join-code" placeholder="ABCD-EFGH" maxlength="9" required></div>
+		<div class="field last"><label for="join-pass">Team password</label><input class="input" id="join-pass" type="password" required></div>
+		<div class="error" id="join-err" role="alert"></div>
+		<div class="success" id="join-ok" role="status"></div>
+	</div>
+	<div class="foot"><button class="btn-primary" id="join-submit">Request to join</button></div>
 </form>
 </div>
 <script nonce="{{nonce}}" src="{{js}}"></script>
@@ -65,7 +76,12 @@
 const invites = [];
 const $ = id => document.getElementById(id);
 const err = $('err');
+const joinErr = $('join-err');
+const joinOk = $('join-ok');
+let signedIn = Boolean(data.signedIn);
 const okEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+const setButton = () => $('submit').textContent = signedIn ? 'Create team' : 'Sign in to create a team';
+setButton();
 
 function drawInvites() {
 	$('invites').replaceChildren(...invites.map((v, i) => el('div', { class: 'invitee' },
@@ -105,11 +121,27 @@ $('file').addEventListener('change', () => {
 $('cancel').addEventListener('click', () => vscode.postMessage({ type: 'close' }));
 $('form').addEventListener('submit', e => {
 	e.preventDefault();
+	if (!signedIn) return vscode.postMessage({ type: 'signIn' });
 	err.textContent = '';
 	if (!$('name').value.trim()) return $('name').focus(), err.textContent = 'Give your team a name.';
 	if ($('pass').value.length < 8) return $('pass').focus(), err.textContent = 'The team password needs at least 8 characters.';
-	vscode.postMessage({ type: 'notReady', text: 'Creating a team' });
+	vscode.postMessage({ type: 'createTeam', name: $('name').value, description: $('desc').value, password: $('pass').value, invites });
 });
+$('join-form').addEventListener('submit', e => {
+	e.preventDefault(); joinErr.textContent = ''; joinOk.textContent = '';
+	if (!signedIn) return vscode.postMessage({ type: 'signIn' });
+	if (!$('join-code').value.trim() || !$('join-pass').value) return joinErr.textContent = 'Enter the join code and password.';
+	vscode.postMessage({ type: 'joinTeam', joinCode: $('join-code').value, password: $('join-pass').value });
+});
+onCodelerMessage(m => {
+	if (m.type === 'teamData') { signedIn = Boolean(m.signedIn); setButton(); }
+	if (m.type === 'teamError') { err.textContent = m.error; joinErr.textContent = m.error; }
+	if (m.type === 'teamCreated') {
+		err.textContent = ''; document.querySelector('.card-body').prepend(el('div', { class: 'success', role: 'status' }, `Team created. Your join code is ${m.joinCode}. `, el('button', { class: 'btn-ghost', type: 'button', onclick: async e => { await navigator.clipboard?.writeText(m.joinCode); e.currentTarget.textContent = 'Copied'; } }, 'Copy')));
+	}
+	if (m.type === 'joinResult') joinOk.textContent = m.status === 'active' ? 'You joined the team.' : 'Request sent. You can start once an owner or admin approves you.';
+});
+vscode.postMessage({ type: 'ready' });
 </script>
 </body>
 </html>

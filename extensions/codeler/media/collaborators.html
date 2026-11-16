@@ -1,21 +1,9 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="{{csp}}">
-<link rel="stylesheet" href="{{css}}">
-</head>
-<body>
-<script type="application/json" id="data">{{data}}</script>
-<div class="list" id="list"></div>
-<script nonce="{{nonce}}" src="{{js}}"></script>
-<script nonce="{{nonce}}">
-let followingUserId = data.followingUserId;
-const draw = people => { const list = document.getElementById('list'); list.replaceChildren(...people.map(p => el('div', { class: 'item' }, avatar(p, p.online),
-		el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.file ? `${p.online ? 'Online' : 'Offline'} · ${p.file}:${(p.cursorLine ?? 0)}` : (p.online ? 'Online' : 'Offline'))),
-		p.isMe || !p.userId ? null : el('button', { class: 'btn-ghost', 'aria-pressed': followingUserId === p.userId ? 'true' : 'false', onclick: () => followingUserId === p.userId ? vscode.postMessage({ type: 'stopFollowing' }) : vscode.postMessage({ type: 'follow', userId: p.userId }) }, followingUserId === p.userId ? 'Following' : 'Follow')))); };
-draw(data.people);
-onCodelerMessage(m => { if (m.type === 'presence') { followingUserId = m.followingUserId; draw(m.people); } });
-</script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="{{csp}}"><link rel="stylesheet" href="{{css}}"></head>
+<body><script type="application/json" id="data">{{data}}</script><div class="list" id="list"></div>
+<script nonce="{{nonce}}" src="{{js}}"></script><script nonce="{{nonce}}">
+let followingUserId = data.followingUserId; let members;
+const draw = people => { const list = document.getElementById('list'); const rows = members ? members.active.map(p => ({ ...p, initials: p.name.split(/\s+/).map(s => s[0] || '').join('').slice(0, 2).toUpperCase(), color: '#2684f5', online: people.some(x => x.userId === p.userId) })) : people; const pending = members?.pending ?? [];
+list.replaceChildren(...(members && members.me !== 'member' && pending.length ? [el('h3', {}, 'Waiting to join'), ...pending.map(p => el('div', { class: 'item' }, avatar({ ...p, initials: p.name[0], color: '#2684f5' }, false), el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.email)), el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'approve', memberId: p.id }) }, 'Approve'), el('button', { class: 'btn-ghost', onclick: () => vscode.postMessage({ type: 'deny', memberId: p.id }) }, 'Deny')))] : []), ...rows.map(p => el('div', { class: 'item' }, avatar(p, p.online), el('div', { class: 'grow' }, el('div', {}, p.name), el('div', { class: 'sub' }, p.file ? `${p.online ? 'Online' : 'Offline'} · ${p.file}:${(p.cursorLine ?? 0)}` : (p.online ? 'Online' : 'Offline'))), p.isMe || !p.userId ? null : (members && members.me !== 'member' ? el('button', { class: 'btn-ghost', onclick: () => { if (confirm(`Remove ${p.name} from this team?`)) vscode.postMessage({ type: 'remove', memberId: p.id }); } }, 'Remove') : null), p.isMe || !p.userId ? null : el('button', { class: 'btn-ghost', 'aria-pressed': followingUserId === p.userId ? 'true' : 'false', onclick: () => followingUserId === p.userId ? vscode.postMessage({ type: 'stopFollowing' }) : vscode.postMessage({ type: 'follow', userId: p.userId }) }, followingUserId === p.userId ? 'Following' : 'Follow')))); };
+draw(data.people); onCodelerMessage(m => { if (m.type === 'presence') { followingUserId = m.followingUserId; draw(m.people); } if (m.type === 'teamData') { members = m.members; draw(data.people); } }); vscode.postMessage({ type: 'ready' });
+</script></body></html>

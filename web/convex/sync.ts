@@ -20,6 +20,14 @@ function checkUpdate(update: Uint8Array) {
   if (update.byteLength === 0 || update.byteLength > MAX_UPDATE) throw new ConvexError("Sync update is too large.");
 }
 
+// Keep bytes in the public response in Convex's wire representation. This is
+// also important in convex-test, where database bytes can come back as a
+// Uint8Array even though the response validator accepts ArrayBuffer only.
+function responseBytes(value: ArrayBuffer | Uint8Array) {
+  if (value instanceof ArrayBuffer) return value;
+  return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
+}
+
 export const listFiles = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
@@ -36,7 +44,11 @@ export const loadFile = query({
     if (!file) return null;
     const snapshot = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id).eq("version", file.snapshotVersion)).unique();
     const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", file.snapshotVersion)).collect();
-    return { file, snapshot: snapshot?.state ?? new Uint8Array(), updates: updates.sort((a, b) => a.version - b.version) };
+    return {
+      file,
+      snapshot: snapshot ? responseBytes(snapshot.state) : new ArrayBuffer(0),
+      updates: updates.sort((a, b) => a.version - b.version).map((row) => ({ ...row, update: responseBytes(row.update) })),
+    };
   },
 });
 
@@ -47,7 +59,7 @@ export const updates = query({
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) return { version: 0, updates: [] };
     const rows = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", afterVersion)).collect();
-    return { version: file.version, updates: rows.sort((a, b) => a.version - b.version) };
+    return { version: file.version, updates: rows.sort((a, b) => a.version - b.version).map((row) => ({ ...row, update: responseBytes(row.update) })) };
   },
 });
 

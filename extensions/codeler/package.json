@@ -20,12 +20,6 @@
         "path": "./themes/codeler-dark.json"
       }
     ],
-    "colors": [
-      { "id": "codeler.person1", "description": "Codeler collaborator color 1", "defaults": { "dark": "#3fbf5c", "light": "#3fbf5c", "highContrast": "#3fbf5c" } },
-      { "id": "codeler.person2", "description": "Codeler collaborator color 2", "defaults": { "dark": "#2684f5", "light": "#2684f5", "highContrast": "#2684f5" } },
-      { "id": "codeler.person3", "description": "Codeler collaborator color 3", "defaults": { "dark": "#f2842b", "light": "#f2842b", "highContrast": "#f2842b" } },
-      { "id": "codeler.person4", "description": "Codeler collaborator color 4", "defaults": { "dark": "#b26bd1", "light": "#b26bd1", "highContrast": "#b26bd1" } }
-    ],
     "configurationDefaults": {
       "workbench.colorTheme": "Codeler Dark",
       "editor.fontFamily": "'JetBrains Mono', Consolas, 'Courier New', monospace",
@@ -108,6 +102,12 @@
           "id": "codeler.workspaces",
           "name": "Workspaces"
         }
+      ],
+      "debug": [
+        {
+          "id": "codeler.runCommands",
+          "name": "Run commands"
+        }
       ]
     },
     "commands": [
@@ -128,6 +128,35 @@
         "title": "Run",
         "category": "Codeler",
         "icon": "$(play)"
+      },
+      {
+        "command": "codeler.addRunCommand",
+        "title": "Add run command",
+        "category": "Codeler",
+        "icon": "$(add)"
+      },
+      {
+        "command": "codeler.runCommand",
+        "title": "Run",
+        "category": "Codeler",
+        "icon": "$(play)"
+      },
+      {
+        "command": "codeler.editRunCommand",
+        "title": "Edit",
+        "category": "Codeler",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "codeler.deleteRunCommand",
+        "title": "Delete",
+        "category": "Codeler",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "codeler.setDefaultRunCommand",
+        "title": "Set as default",
+        "category": "Codeler"
       },
       {
         "command": "codeler.toggleSampleCursors",
@@ -168,6 +197,23 @@
         "command": "codeler.signOut",
         "title": "Sign out",
         "category": "Codeler"
+      },
+      {
+        "command": "codeler.saveSnapshot",
+        "title": "Save snapshot",
+        "category": "Codeler",
+        "icon": "$(check)"
+      },
+      {
+        "command": "codeler.history",
+        "title": "Show version history",
+        "category": "Codeler",
+        "icon": "$(history)"
+      },
+      {
+        "command": "codeler.restoreSnapshot",
+        "title": "Restore snapshot",
+        "category": "Codeler"
       }
     ],
     "configuration": {
@@ -204,6 +250,45 @@
         {
           "command": "codeler.createTeam",
           "when": "view == codeler.workspaces",
+          "group": "navigation"
+        },
+        {
+          "command": "codeler.addRunCommand",
+          "when": "view == codeler.runCommands",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codeler.runCommand",
+          "when": "view == codeler.runCommands",
+          "group": "inline"
+        },
+        {
+          "command": "codeler.editRunCommand",
+          "when": "view == codeler.runCommands",
+          "group": "inline@2"
+        },
+        {
+          "command": "codeler.deleteRunCommand",
+          "when": "view == codeler.runCommands",
+          "group": "inline@3"
+        },
+        {
+          "command": "codeler.setDefaultRunCommand",
+          "when": "view == codeler.runCommands",
+          "group": "navigation"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "codeler.saveSnapshot",
+          "when": "scmProvider == codeler",
+          "group": "navigation"
+        },
+        {
+          "command": "codeler.history",
+          "when": "scmProvider == codeler",
           "group": "navigation"
         }
       ]

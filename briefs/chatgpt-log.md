@@ -91,3 +91,25 @@ Not checked:
 ## Claude's review of task 2 fixes
 - All 6 review items verified in code; 19 tests pass; compiled presence/sync load.
 - Claude fixed: reading `.webview` from a disposed panel/view throws in VS Code, which would have left the activity bar stuck wide after closing the Team page. Keep your own reference to a webview before registering `onDidDispose`.
+
+## Task 7 — run button, run commands, languages
+
+Built:
+
+- Added `extensions/codeler/src/run/logic.ts` with pure run.json validation, package-manager and project run-command detection, language detection, and tool mapping.
+- Added `extensions/codeler/src/run/index.ts` with `.codeler/run.json` loading/saving, default detection and save prompt, terminal reuse, Run & Debug tree commands, and Simple Browser handling for an HTML-only project.
+- Added `extensions/codeler/src/run/tools.ts` with cached no-shell PATH checks, missing-tool guidance, official install links, and one-time Open VSX extension offers with per-language suppression.
+- Registered the run subsystem and removed the placeholder `codeler.run` registration. Added the `codeler.runCommands` debug view plus Run/Edit/Delete/Set as default/Add contributions and menus.
+- Added pure tests covering each detection rule, lockfiles, broken run.json rejection, command preservation, and language tool mapping.
+
+Verification:
+
+- `node --test extensions/codeler/src/run/*.test.ts`: 4 passed, 0 failed.
+- Type-check passed for `src/run/*.ts` with the repository TypeScript, `--module esnext --moduleResolution bundler`, repository VS Code declarations, and Node types.
+- `bash scripts/sync-extension.sh` completed; `npm.cmd run gulp transpile-extension:codeler` completed with 0 compilation errors.
+- Every generated `out/run/*.js` loaded with a stub `vscode` containing `window`, `workspace`, `commands`, `extensions`, `Disposable`, `EventEmitter`, `TreeItem`, and `ThemeIcon`; embedded tests also passed 4/4. The test-only `.ts`-to-`.js` resolver was used for the compiled test's source-test import.
+
+Not checked:
+
+- No full VSCodium UI run, real terminal command execution, PATH variation, extension installation, or official download page interaction was performed.
+- The literal `npx` type-check command could not run because npm attempted to create a blocked machine cache directory; the installed repository TypeScript binary produced the passing check above.

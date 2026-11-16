@@ -18,9 +18,13 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "typescript": "^5"
+    "convex-test": "^0.0.71",
+    "typescript": "^5",
+    "vitest": "^4.1.12",
+    "yjs": "^13.6.33"
   }
 }

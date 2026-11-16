@@ -5,6 +5,10 @@ import { Auth } from './auth';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
+import { TeamClient } from './teams/client';
+import { cleanCreate, cleanJoin } from './teams/logic';
+import { startRun } from './run';
+import { startHistory } from './history';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
@@ -16,15 +20,15 @@ const presencePeople = () => presenceRows.map(p => ({ userId: p.userId, isMe: p.
 
 // Panels are plain HTML files in media/; each gets the shared stylesheet and a strict CSP.
 class Panel implements vscode.WebviewViewProvider {
-	constructor(private ctx: vscode.ExtensionContext, private page: string) { }
+	constructor(private ctx: vscode.ExtensionContext, private page: string, private teams: TeamClient, private auth: Auth) { }
 	resolveWebviewView(view: vscode.WebviewView) {
 		const webview = view.webview;
-		render(this.ctx, webview, this.page);
+		render(this.ctx, webview, this.page, this.teams, this.auth);
 		view.onDidDispose(() => presenceViews.delete(webview));
 	}
 }
 
-function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: string) {
+function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: string, teams?: TeamClient, auth?: Auth) {
 	presenceViews.add(webview);
 	const media = vscode.Uri.joinPath(ctx.extensionUri, 'media');
 	webview.options = { enableScripts: true, localResourceRoots: [media] };
@@ -38,7 +42,19 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 			.replaceAll('{{js}}', webview.asWebviewUri(vscode.Uri.joinPath(media, 'codeler.js')).toString())
 			.replace('{{data}}', JSON.stringify(sample).replaceAll('<', '\\u003c'));
 	});
-	webview.onDidReceiveMessage((m: { type: string; file?: string; line?: number; text?: string; userId?: string }) => {
+	const refresh = async () => {
+		if (!teams || !auth) return;
+		const signedIn = Boolean(auth.me);
+		if (!signedIn) { void webview.postMessage({ type: 'teamData', signedIn: false }); return; }
+		try {
+			const mine = await teams.mine();
+			const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
+			const current = mine.find(t => t.projects?.some(p => p.id === projectId));
+			const members = current ? await teams.people(current.teamId) : undefined;
+			void webview.postMessage({ type: 'teamData', signedIn: true, teams: mine, members });
+		} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+	};
+	webview.onDidReceiveMessage(async (m: { type: string; file?: string; line?: number; text?: string; userId?: string; name?: string; description?: string; password?: string; invites?: { email: string; role: 'Admin' | 'Member' }[]; joinCode?: string; memberId?: string; projectId?: string; projectName?: string }) => {
 		if (m.type === 'openLine' && m.file) {
 			// shortcut: sample links resolve inside the first workspace folder only, until real project paths come from Convex
 			const root = vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -47,6 +63,32 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 			vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 		} else if (m.type === 'notReady') {
 			vscode.window.showInformationMessage(`${m.text} works once login and teams are connected.`);
+		} else if (m.type === 'ready') {
+			void refresh();
+		} else if (m.type === 'signIn') {
+			void auth?.signIn();
+		} else if (m.type === 'createTeam' && teams && auth) {
+			try {
+				if (!auth.me) return void vscode.commands.executeCommand('codeler.signIn');
+				const result = await teams.create(cleanCreate(m.name ?? '', m.description ?? '', m.password ?? '', (m.invites ?? []).map(i => ({ email: i.email, role: i.role.toLowerCase() as 'admin' | 'member' }))));
+				void webview.postMessage({ type: 'teamCreated', joinCode: result.joinCode });
+			} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'joinTeam' && teams && auth) {
+			try {
+				if (!auth.me) return void vscode.commands.executeCommand('codeler.signIn');
+				const result = await vscode.commands.executeCommand<{ status: 'pending' | 'active' }>('codeler.joinTeam', { joinCode: cleanJoin(m.joinCode ?? '', m.password ?? '').joinCode, password: m.password ?? '' });
+				void webview.postMessage({ type: 'joinResult', status: result.status });
+			} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'project' && m.projectId) {
+			await vscode.workspace.getConfiguration('codeler').update('projectId', m.projectId, vscode.ConfigurationTarget.Global);
+			if (m.projectName) await vscode.workspace.getConfiguration('codeler').update('projectName', m.projectName, vscode.ConfigurationTarget.Global);
+			await vscode.commands.executeCommand('workbench.action.reloadWindow');
+		} else if (m.type === 'approve' && teams && m.memberId) {
+			try { await teams.approve(m.memberId); await refresh(); } catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'deny' && teams && m.memberId) {
+			try { await teams.deny(m.memberId); await refresh(); } catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'remove' && teams && m.memberId) {
+			try { await teams.remove(m.memberId); await refresh(); } catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
 		} else if (m.type === 'follow' && m.userId) {
 			follow(m.userId);
 		} else if (m.type === 'stopFollowing') {
@@ -88,11 +130,14 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 
 export function activate(ctx: vscode.ExtensionContext) {
 	const auth = new Auth(ctx.secrets);
+	const teams = new TeamClient(auth);
 	currentUserId = auth.me?.id;
 	ctx.subscriptions.push(startSync(ctx, auth));
+	ctx.subscriptions.push(startRun(ctx));
+	ctx.subscriptions.push(startHistory(ctx));
 	const projectId = () => Boolean(vscode.workspace.getConfiguration('codeler').get<string>('projectId', '') && auth.me);
 	for (const [id, page] of [['codeler.chat', 'chat'], ['codeler.activity', 'activity'], ['codeler.collaborators', 'collaborators'], ['codeler.workspaces', 'workspaces']])
-		ctx.subscriptions.push(vscode.window.registerWebviewViewProvider(id, new Panel(ctx, page), { webviewOptions: { retainContextWhenHidden: true } }));
+		ctx.subscriptions.push(vscode.window.registerWebviewViewProvider(id, new Panel(ctx, page, teams, auth), { webviewOptions: { retainContextWhenHidden: true } }));
 	// Clicking Team in the activity bar opens the full Team page instead of a narrow side panel.
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider('codeler.team', {
 		resolveWebviewView(view) {
@@ -122,7 +167,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 		const root = vscode.workspace.workspaceFolders?.[0];
 		vscode.commands.executeCommand('_codeler.titlebar.setState', {
 			mode: mode(),
-			project: team ? sample.teams[0].name : root?.name ?? 'Open project',
+			project: team ? (vscode.workspace.getConfiguration('codeler').get<string>('projectName', '') || sample.teams[0].name) : root?.name ?? 'Open project',
 			branch: 'main',
 			people: team ? (activeTeam ? presencePeople() : sample.people) : [],
 			unread: team ? 1 : 0,
@@ -178,15 +223,18 @@ export function activate(ctx: vscode.ExtensionContext) {
 			teamPanel.onDidChangeViewState(e => expand(e.webviewPanel.active));
 			const teamWebview = teamPanel.webview; // a disposed panel's .webview throws, so keep our own reference
 			teamPanel.onDidDispose(() => { presenceViews.delete(teamWebview); teamPanel = undefined; expand(false); });
-			render(ctx, teamWebview, 'team');
+			 render(ctx, teamWebview, 'team', teams, auth);
 		}),
 		vscode.commands.registerCommand('codeler.share', () => vscode.window.showInformationMessage('Sharing your preview works once teams are connected.')),
-		vscode.commands.registerCommand('codeler.run', () => vscode.commands.executeCommand('workbench.action.debug.run')),
 		vscode.commands.registerCommand('codeler.toggleSampleCursors', () => { showCursors = !showCursors; paintCursors(); }),
 		vscode.commands.registerCommand('codeler.pickProject', async () => {
-			const pick = await vscode.window.showQuickPick([...sample.teams.flatMap(t => t.projects.map(p => ({ label: p, description: t.name }))), { label: '$(folder-opened) Open a folder on this PC…', description: '' }], { placeHolder: 'Switch project' });
-			if (pick?.label.startsWith('$(folder-opened)')) vscode.commands.executeCommand('workbench.action.files.openFolder');
+			const mine = auth.me ? await teams.mine().catch(() => []) : [];
+			const picks = mine.flatMap(t => (t.projects ?? []).map(p => ({ label: p.name, description: t.name, id: p.id })));
+			const pick = await vscode.window.showQuickPick([...picks, { label: '$(folder-opened) Open a folder on this PC…', description: '', id: '' }], { placeHolder: 'Switch project' });
+			if (pick?.label.startsWith('$(folder-opened)')) return void vscode.commands.executeCommand('workbench.action.files.openFolder');
+			if (pick?.id) { await vscode.workspace.getConfiguration('codeler').update('projectId', pick.id, vscode.ConfigurationTarget.Global); await vscode.workspace.getConfiguration('codeler').update('projectName', pick.label, vscode.ConfigurationTarget.Global); await vscode.commands.executeCommand('workbench.action.reloadWindow'); }
 		}),
+		vscode.commands.registerCommand('codeler.joinTeam', async (args?: { joinCode?: string; password?: string }) => args?.joinCode && args.password ? teams.join(cleanJoin(args.joinCode, args.password).joinCode, args.password) : undefined),
 		vscode.commands.registerCommand('codeler.pickBranch', () => vscode.window.showInformationMessage('Version history comes with the Changes view.')),
 		vscode.commands.registerCommand('codeler.notifications', () => vscode.commands.executeCommand('notifications.showList')),
 		vscode.commands.registerCommand('codeler.signIn', () => auth.signIn()),

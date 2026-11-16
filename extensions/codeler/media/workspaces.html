@@ -1,19 +1,8 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="{{csp}}">
-<link rel="stylesheet" href="{{css}}">
-</head>
-<body>
-<script type="application/json" id="data">{{data}}</script>
-<div class="list" id="list"></div>
-<script nonce="{{nonce}}" src="{{js}}"></script>
-<script nonce="{{nonce}}">
-for (const t of data.teams)
-	document.getElementById('list').append(el('div', { class: 'item' },
-		el('div', { class: 'grow' }, el('div', {}, t.name), el('div', { class: 'sub' }, `${t.projects.length} project · ${t.role}`)),
-		t.pending ? el('span', { class: 'pill', title: 'Waiting for approval' }, `${t.pending} waiting`) : null));
-</script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="{{csp}}"><link rel="stylesheet" href="{{css}}"></head>
+<body><script type="application/json" id="data">{{data}}</script><div class="list" id="list"></div>
+<script nonce="{{nonce}}" src="{{js}}"></script><script nonce="{{nonce}}">
+const list = document.getElementById('list');
+function draw(teams) { list.replaceChildren(...teams.map(t => el('div', { class: 'workspace-team' }, el('div', { class: 'item' }, el('div', { class: 'grow' }, el('div', {}, t.name), el('div', { class: 'sub' }, `${(t.projects ?? []).length} projects · ${t.role}`)), t.waiting ? el('span', { class: 'pill' }, `${t.waiting} waiting`) : null), ...(t.status === 'active' ? (t.projects ?? []).map(p => el('button', { class: 'btn-ghost project', type: 'button', onclick: () => vscode.postMessage({ type: 'project', projectId: p.id, projectName: p.name }) }, p.name)) : []), t.joinCode ? el('div', { class: 'sub' }, `Join code: ${t.joinCode}`) : null))); }
+draw(data.teams); onCodelerMessage(m => { if (m.type === 'teamData') draw(m.signedIn ? (m.teams ?? []) : data.teams); }); vscode.postMessage({ type: 'ready' });
+</script></body></html>
