@@ -1,0 +1,91 @@
+diff --git a/prepare_vscode.sh b/prepare_vscode.sh
+index 3f551ca..b999c6a 100755
+--- a/prepare_vscode.sh
++++ b/prepare_vscode.sh
+@@ -7,6 +7,8 @@ if [[ "${VSCODE_QUALITY}" == "insider" ]]; then
+   cp -rp src/insider/* vscode/
+ else
+   cp -rp src/stable/* vscode/
++  # Codeler: built-in extension (teams, chat, cursors, login)
++  ../scripts/sync-extension.sh
+ fi
+ 
+ cp -f LICENSE vscode/LICENSE.txt
+@@ -42,15 +44,15 @@ setpath "product" "introductoryVideosUrl" "https://go.microsoft.com/fwlink/?link
+ setpath "product" "keyboardShortcutsUrlLinux" "https://go.microsoft.com/fwlink/?linkid=832144"
+ setpath "product" "keyboardShortcutsUrlMac" "https://go.microsoft.com/fwlink/?linkid=832143"
+ setpath "product" "keyboardShortcutsUrlWin" "https://go.microsoft.com/fwlink/?linkid=832145"
+-setpath "product" "licenseUrl" "https://github.com/VSCodium/vscodium/blob/master/LICENSE"
++# Codeler: licenseUrl set once the GitHub repo exists
+ setpath_json "product" "linkProtectionTrustedDomains" '["https://open-vsx.org"]'
+ setpath "product" "releaseNotesUrl" "https://go.microsoft.com/fwlink/?LinkID=533483#vscode"
+-setpath "product" "reportIssueUrl" "https://github.com/VSCodium/vscodium/issues/new"
++# Codeler: reportIssueUrl set once the GitHub repo exists
+ setpath "product" "requestFeatureUrl" "https://go.microsoft.com/fwlink/?LinkID=533482"
+ setpath "product" "tipsAndTricksUrl" "https://go.microsoft.com/fwlink/?linkid=852118"
+ setpath "product" "twitterUrl" "https://go.microsoft.com/fwlink/?LinkID=533687"
+ 
+-if [[ "${DISABLE_UPDATE}" != "yes" ]]; then
++if [[ "${DISABLE_UPDATE}" != "yes" && -n "${CODELER_UPDATE_URL}" ]]; then
+   setpath "product" "updateUrl" "https://raw.githubusercontent.com/VSCodium/versions/refs/heads/master"
+ 
+   if [[ "${VSCODE_QUALITY}" == "insider" ]]; then
+@@ -93,32 +95,33 @@ if [[ "${VSCODE_QUALITY}" == "insider" ]]; then
+   setpath "product" "win32ContextMenu.x64.clsid" "90AAD229-85FD-43A3-B82D-8598A88829CF"
+   setpath "product" "win32ContextMenu.arm64.clsid" "7544C31C-BDBF-4DDF-B15E-F73A46D6723D"
+ else
+-  setpath "product" "nameShort" "VSCodium"
+-  setpath "product" "nameLong" "VSCodium"
+-  setpath "product" "applicationName" "codium"
+-  setpath "product" "linuxIconName" "vscodium"
++  setpath "product" "nameShort" "Codeler"
++  setpath "product" "nameLong" "Codeler"
++  setpath "product" "applicationName" "codeler"
++  setpath "product" "linuxIconName" "codeler"
+   setpath "product" "quality" "stable"
+-  setpath "product" "urlProtocol" "vscodium"
+-  setpath "product" "serverApplicationName" "codium-server"
+-  setpath "product" "serverDataFolderName" ".vscodium-server"
+-  setpath "product" "darwinBundleIdentifier" "com.vscodium"
+-  setpath "product" "win32AppUserModelId" "VSCodium.VSCodium"
+-  setpath "product" "win32DirName" "VSCodium"
+-  setpath "product" "win32MutexName" "vscodium"
+-  setpath "product" "win32NameVersion" "VSCodium"
+-  setpath "product" "win32RegValueName" "VSCodium"
+-  setpath "product" "win32ShellNameShort" "VSCodium"
+-  setpath "product" "win32AppId" "{{763CBF88-25C6-4B10-952F-326AE657F16B}"
+-  setpath "product" "win32x64AppId" "{{88DA3577-054F-4CA1-8122-7D820494CFFB}"
+-  setpath "product" "win32arm64AppId" "{{67DEE444-3D04-4258-B92A-BC1F0FF2CAE4}"
+-  setpath "product" "win32UserAppId" "{{0FD05EB4-651E-4E78-A062-515204B47A3A}"
+-  setpath "product" "win32x64UserAppId" "{{2E1F05D1-C245-4562-81EE-28188DB6FD17}"
+-  setpath "product" "win32arm64UserAppId" "{{57FD70A5-1B8D-4875-9F40-C5553F094828}"
+-  setpath "product" "tunnelApplicationName" "codium-tunnel"
+-  setpath "product" "win32TunnelServiceMutex" "vscodium-tunnelservice"
+-  setpath "product" "win32TunnelMutex" "vscodium-tunnel"
+-  setpath "product" "win32ContextMenu.x64.clsid" "D910D5E6-B277-4F4A-BDC5-759A34EEE25D"
+-  setpath "product" "win32ContextMenu.arm64.clsid" "4852FC55-4A84-4EA1-9C86-D53BE3DF83C0"
++  setpath "product" "dataFolderName" ".codeler"
++  setpath "product" "urlProtocol" "codeler"
++  setpath "product" "serverApplicationName" "codeler-server"
++  setpath "product" "serverDataFolderName" ".codeler-server"
++  setpath "product" "darwinBundleIdentifier" "com.codeler.Codeler"
++  setpath "product" "win32AppUserModelId" "Codeler.Codeler"
++  setpath "product" "win32DirName" "Codeler"
++  setpath "product" "win32MutexName" "codeler"
++  setpath "product" "win32NameVersion" "Codeler"
++  setpath "product" "win32RegValueName" "Codeler"
++  setpath "product" "win32ShellNameShort" "Codeler"
++  setpath "product" "win32AppId" "{{6E547171-72E3-431E-BE14-FDF1EE381CA8}"
++  setpath "product" "win32x64AppId" "{{A91798E3-E731-49E4-87C9-05B149F111E1}"
++  setpath "product" "win32arm64AppId" "{{E6152408-9F1E-4EAE-B573-01BDF3CFB81A}"
++  setpath "product" "win32UserAppId" "{{6A6131D9-B9F3-4EF4-AFFF-AC5B2F7B7AD7}"
++  setpath "product" "win32x64UserAppId" "{{1005A955-E03B-40DA-B3E9-250DECDAB37D}"
++  setpath "product" "win32arm64UserAppId" "{{0F7715BC-FC19-41F3-A5FA-F22FAF739E46}"
++  setpath "product" "tunnelApplicationName" "codeler-tunnel"
++  setpath "product" "win32TunnelServiceMutex" "codeler-tunnelservice"
++  setpath "product" "win32TunnelMutex" "codeler-tunnel"
++  setpath "product" "win32ContextMenu.x64.clsid" "7C67133E-C01E-48DE-A6C9-60B1C330BEE7"
++  setpath "product" "win32ContextMenu.arm64.clsid" "08F7C9C2-B445-40C1-9AFB-C89DA5C00034"
+ fi
+ 
+ setpath_json "product" "tunnelApplicationConfig" '{}'
