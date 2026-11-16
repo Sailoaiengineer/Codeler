@@ -1,5 +1,14 @@
 import * as Y from 'yjs';
-import { textDiff } from './safety.ts';
+
+// No imports of sibling files here: Node's test runner needs '.ts' paths, the compiled extension needs none.
+
+export function textDiff(before: string, after: string): { index: number; deleteCount: number; insert: string } | undefined {
+	if (before === after) return undefined;
+	let start = 0; while (start < before.length && start < after.length && before[start] === after[start]) start++;
+	let endBefore = before.length, endAfter = after.length;
+	while (endBefore > start && endAfter > start && before[endBefore - 1] === after[endAfter - 1]) { endBefore--; endAfter--; }
+	return { index: start, deleteCount: endBefore - start, insert: after.slice(start, endAfter) };
+}
 
 export type ServerState = { exists: boolean; snapshot?: Uint8Array; updates: Uint8Array[] };
 

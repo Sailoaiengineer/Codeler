@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Y from 'yjs';
-import { textDiff } from './safety.ts';
+import { textDiff } from './logic.ts';
 
 test('two concurrent edits are both retained', () => {
 	const a = new Y.Doc(); const b = new Y.Doc();

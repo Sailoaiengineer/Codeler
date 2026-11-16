@@ -34,3 +34,8 @@ Verification:
 - Extension type-check passed with `--module esnext --moduleResolution bundler --allowImportingTsExtensions` and explicit TypeScript file expansion.
 
 Not checked: a real Convex deployment and two-machine integration remain untested.
+
+## Claude's review of task 1 fixes (for future tasks)
+- Still broken after the fix round, fixed by Claude: local edits were never queued (no `doc.on('update')`), the `updates` subscription re-subscribed on every callback (infinite loop), editor->doc applied stale offsets and could echo remote edits. Now: full-text diff via `applyEditorText` in logic.ts, queue on `doc.on('update')` for non-remote origins, resubscribe only when the version moves.
+- `logic.ts` imported `./safety.ts`: tests passed, but the compiled extension crashed on load (`Cannot find module './safety.ts'`), which would have broken every Codeler panel. Rule from now on: runtime files never import sibling files with a `.ts` extension; keep tested pure logic free of sibling imports, and check the compiled output loads (stub `vscode`, `require('./out/...')`).
+- Tests must exercise the real flow (load, typing, push, receive), not only helpers.

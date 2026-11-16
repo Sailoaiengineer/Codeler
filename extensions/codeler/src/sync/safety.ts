@@ -35,10 +35,3 @@ export function safePath(root: string, relative: string): string | undefined {
 	}
 }
 
-export function textDiff(before: string, after: string): { index: number; deleteCount: number; insert: string } | undefined {
-	if (before === after) return undefined;
-	let start = 0; while (start < before.length && start < after.length && before[start] === after[start]) start++;
-	let endBefore = before.length, endAfter = after.length;
-	while (endBefore > start && endAfter > start && before[endBefore - 1] === after[endAfter - 1]) { endBefore--; endAfter--; }
-	return { index: start, deleteCount: endBefore - start, insert: after.slice(start, endAfter) };
-}

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isIgnored, isSafeRelativePath, textDiff } from './safety.ts';
+import { isIgnored, isSafeRelativePath } from './safety.ts';
+import { textDiff } from './logic.ts';
 
 test('rejects traversal, absolute, drive and nul paths', () => {
 	for (const value of ['../x', '/x', '\\x', 'C:\\x', 'a\0b', 'a/../b']) assert.equal(isSafeRelativePath(value), false);

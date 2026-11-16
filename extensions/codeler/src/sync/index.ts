@@ -4,8 +4,8 @@ import * as path from 'node:path';
 import { ConvexClient } from 'convex/browser';
 import * as Y from 'yjs';
 import { Auth } from '../auth';
-import { isIgnored, looksBinary, safePath, textDiff } from './safety';
-import { applyEditorText, loadDocument, PendingUpdates } from './logic';
+import { isIgnored, looksBinary, safePath } from './safety';
+import { applyEditorText, loadDocument, PendingUpdates, textDiff } from './logic';
 
 type FileRow = { _id: string; path: string; version: number };
 type State = { file: string; doc: Y.Doc; text: Y.Text; disk: string; synced: string; version: number; queued: PendingUpdates; applying: boolean; unsubscribe?: () => void; fileId?: string };
