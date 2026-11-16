@@ -23,3 +23,14 @@ Not checked:
 Claude should consider:
 
 - Supplying the active team `projectId` through the existing project-selection flow instead of the temporary `codeler.projectId` setting.
+
+## Task 1 review fixes
+
+Fixed the reviewed live-sync issues: server-first hydration without duplicate text, offline-disk reconciliation, editor content-change application, remote edits through `WorkspaceEdit`, merged retry-safe push queues, file list reconciliation, create/delete/rename handling, versioned update subscriptions, typed sync RPC wrappers, and Convex version/snapshot/rename safeguards. Added `src/sync/logic.ts` and `logic.test.ts` for the five requested pure Yjs scenarios. Removed the temporary npm cache and marked `codeler.projectId` temporary.
+
+Verification:
+
+- `node --test extensions/codeler/src/sync/*.test.ts`: 10 passed, 0 failed.
+- Extension type-check passed with `--module esnext --moduleResolution bundler --allowImportingTsExtensions` and explicit TypeScript file expansion.
+
+Not checked: a real Convex deployment and two-machine integration remain untested.

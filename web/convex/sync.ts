@@ -35,8 +35,8 @@ export const loadFile = query({
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) return null;
     const snapshot = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id).eq("version", file.snapshotVersion)).unique();
-    const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
-    return { file, snapshot: snapshot?.state ?? new Uint8Array(), updates: updates.filter((u) => u.version > file.snapshotVersion).sort((a, b) => a.version - b.version) };
+    const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", file.snapshotVersion)).collect();
+    return { file, snapshot: snapshot?.state ?? new Uint8Array(), updates: updates.sort((a, b) => a.version - b.version) };
   },
 });
 
@@ -46,8 +46,8 @@ export const updates = query({
     await requireProjectMember(ctx, projectId); checkPath(path);
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) return { version: 0, updates: [] };
-    const rows = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
-    return { version: Math.max(file.snapshotVersion, ...rows.map((r) => r.version)), updates: rows.filter((r) => r.version > afterVersion).sort((a, b) => a.version - b.version) };
+    const rows = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", afterVersion)).collect();
+    return { version: file.version, updates: rows.sort((a, b) => a.version - b.version) };
   },
 });
 
@@ -59,12 +59,12 @@ export const pushUpdates = mutation({
     for (const update of updates) checkUpdate(update);
     let file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) {
-      const now = Date.now(); const id = await ctx.db.insert("syncFiles", { projectId, path, size, snapshotVersion: 0, updatedAt: now });
+      const now = Date.now(); const id = await ctx.db.insert("syncFiles", { projectId, path, size, snapshotVersion: 0, version: 0, updatedAt: now });
       file = await ctx.db.get(id); if (!file) throw new ConvexError("Could not create sync file.");
     }
-    let version = Math.max(file.snapshotVersion, ...(await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file!._id)).collect()).map((r) => r.version));
+    let version = file.version;
     for (const update of updates) await ctx.db.insert("syncUpdates", { fileId: file._id, version: ++version, update, createdAt: Date.now() });
-    await ctx.db.patch(file._id, { size, updatedAt: Date.now() });
+    await ctx.db.patch(file._id, { size, version, updatedAt: Date.now() });
     return version;
   },
 });
@@ -75,17 +75,19 @@ export const saveSnapshot = mutation({
     await requireProjectMember(ctx, projectId); checkPath(path);
     if (state.byteLength > MAX_UPDATE * 8 || size > MAX_FILE) throw new ConvexError("Snapshot is too large.");
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
-    if (!file || version < file.snapshotVersion) return;
+    if (!file || version < file.snapshotVersion || version > file.version) return;
     await ctx.db.insert("syncSnapshots", { fileId: file._id, version, state, createdAt: Date.now() });
     await ctx.db.patch(file._id, { snapshotVersion: version, size, updatedAt: Date.now() });
     const old = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
     for (const row of old) if (row.version <= version) await ctx.db.delete(row._id);
+    const oldSnapshots = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
+    for (const row of oldSnapshots) if (row.version < version) await ctx.db.delete(row._id);
   },
 });
 
 export const renameFile = mutation({
   args: { projectId: v.id("projects"), path: v.string(), newPath: v.string() },
-  handler: async (ctx, { projectId, path, newPath }) => { await requireProjectMember(ctx, projectId); checkPath(path); checkPath(newPath); const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique(); if (file) await ctx.db.patch(file._id, { path: newPath, updatedAt: Date.now() }); },
+  handler: async (ctx, { projectId, path, newPath }) => { await requireProjectMember(ctx, projectId); checkPath(path); checkPath(newPath); const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique(); const target = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", newPath)).unique(); if (target) throw new ConvexError("A file already exists at that path."); if (file) await ctx.db.patch(file._id, { path: newPath, updatedAt: Date.now() }); },
 });
 
 export const deleteFile = mutation({

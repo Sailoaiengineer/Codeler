@@ -62,6 +62,7 @@ export default defineSchema({
     path: v.string(),
     size: v.number(),
     snapshotVersion: v.number(),
+    version: v.number(),
     updatedAt: v.number(),
   }).index("by_project_path", ["projectId", "path"]).index("by_project", ["projectId"]),
 

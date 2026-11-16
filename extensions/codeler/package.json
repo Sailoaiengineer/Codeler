@@ -189,7 +189,7 @@
         "codeler.projectId": {
           "type": "string",
           "default": "",
-          "description": "Convex project ID for the open team project."
+          "description": "Temporary Convex project ID for the open team project; the Workspaces picker will provide this later."
         }
       }
     },
