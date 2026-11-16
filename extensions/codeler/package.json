@@ -70,6 +70,11 @@
           "id": "codeler-collaborators",
           "title": "Collaborators",
           "icon": "$(person-add)"
+        },
+        {
+          "id": "codeler-ai",
+          "title": "AI",
+          "icon": "$(sparkle)"
         }
       ]
     },
@@ -107,6 +112,13 @@
           "type": "webview",
           "id": "codeler.workspaces",
           "name": "Workspaces"
+        }
+      ],
+      "codeler-ai": [
+        {
+          "type": "webview",
+          "id": "codeler.ai",
+          "name": "AI"
         }
       ]
     },
@@ -168,6 +180,16 @@
         "command": "codeler.signOut",
         "title": "Sign out",
         "category": "Codeler"
+      },
+      {
+        "command": "codeler.ai.manageMcp",
+        "title": "Manage MCP servers",
+        "category": "Codeler"
+      },
+      {
+        "command": "codeler.mcp.start",
+        "title": "Copy Codeler MCP setup line",
+        "category": "Codeler"
       }
     ],
     "configuration": {
@@ -196,6 +218,34 @@
           "type": "string",
           "default": "",
           "description": "Temporary Convex project ID for the open team project; the Workspaces picker will provide this later."
+        },
+        "codeler.ai.models": {
+          "type": "object",
+          "default": { "anthropic": "claude-sonnet-5-5", "openai": "gpt-5.6", "google": "gemini-3-pro" },
+          "properties": {
+            "anthropic": { "type": "string", "description": "Anthropic model name." },
+            "openai": { "type": "string", "description": "OpenAI model name." },
+            "google": { "type": "string", "description": "Google model name." }
+          },
+          "additionalProperties": false,
+          "description": "Model name used for each AI provider in the AI panel."
+        },
+        "codeler.mcpServers": {
+          "type": "array",
+          "scope": "application",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$" },
+              "command": { "type": "string", "description": "Program to start (stdio server)." },
+              "args": { "type": "array", "items": { "type": "string" } },
+              "env": { "type": "object", "additionalProperties": { "type": "string" } },
+              "url": { "type": "string", "description": "Address of an HTTP server. Use instead of command." }
+            }
+          },
+          "description": "MCP servers the AI panel can use. Each entry has a name and either a command (with optional args and env) or a url. Only read from user settings."
         }
       }
     },
@@ -211,6 +261,7 @@
   },
   "scripts": {},
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "convex": "^1.48.0",
     "yjs": "^13.6.27"
   },

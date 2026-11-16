@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<link rel="stylesheet" href="{{css}}">
+<style nonce="{{nonce}}">
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 Inter, 'Segoe UI', sans-serif; }
+.ai { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 12px; gap: 10px; }
+.ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.muted { color: var(--muted); font-size: 13px; }
+button, select, textarea { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line-2); border-radius: 6px; }
+button { padding: 4px 10px; cursor: pointer; }
+button:disabled { opacity: 0.45; cursor: default; }
+select { padding: 3px 6px; }
+label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.msg { display: flex; flex-direction: column; gap: 4px; }
+.msg .who { color: var(--muted); font-size: 12px; }
+.msg.user .body { background: var(--row); border-radius: 8px; padding: 8px 10px; }
+.body p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+pre { margin: 0 0 8px; padding: 8px 10px; background: var(--field); border: 1px solid var(--line-2); border-radius: 6px; overflow-x: auto; }
+code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+.note { color: var(--muted); font-size: 13px; }
+.error { color: #ff8a8a; font-size: 13px; }
+.edit { border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.edit-path { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.edit-state { color: var(--muted); font-size: 12px; }
+.edit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.edit-actions button[data-act="apply"] { background: var(--blue-2); border-color: var(--blue-2); color: #fff; }
+.ai-form { display: flex; gap: 8px; align-items: flex-end; }
+.ai-form textarea { flex: 1; min-width: 0; resize: vertical; padding: 8px 10px; }
+.ai-form button { padding: 8px 14px; background: var(--blue-2); border-color: var(--blue-2); color: #fff; }
+</style>
+</head>
+<body>
+<div class="ai">
+	<div class="ai-row">
+		<label>Provider <select id="provider" aria-label="AI provider"></select></label>
+		<span id="model" class="muted"></span>
+	</div>
+	<div class="ai-row">
+		<span id="keyState" class="muted"></span>
+		<button type="button" id="setKey">Set key</button>
+		<button type="button" id="removeKey">Remove key</button>
+	</div>
+	<div class="ai-row">
+		<label><input type="checkbox" id="includeFile"> Include current file</label>
+		<label><input type="checkbox" id="useTools"> Use MCP tools</label>
+		<button type="button" id="mcp">Manage MCP servers</button>
+	</div>
+	<div id="log" class="log" role="log" aria-live="polite"></div>
+	<form id="form" class="ai-form">
+		<textarea id="text" rows="3" aria-label="Message" placeholder="Ask about your code"></textarea>
+		<button type="submit" id="send">Send</button>
+	</form>
+</div>
+<script nonce="{{nonce}}">
+const vscode = acquireVsCodeApi();
+const $ = id => document.getElementById(id);
+const log = $('log');
+const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+
+// Model text is shown as plain text only: fenced blocks become pre elements, other lines become paragraphs.
+function paragraphs(parent, text) {
+	let code = null;
+	let para = [];
+	const flushPara = () => { if (para.length) { parent.append(node('p', '', para.join('\n'))); para = []; } };
+	const flushCode = () => { const pre = node('pre', ''); pre.append(node('code', '', code.join('\n'))); parent.append(pre); code = null; };
+	for (const line of text.split('\n')) {
+		if (/^\s*```/.test(line)) {
+			if (code) flushCode(); else { flushPara(); code = []; }
+		} else if (code) {
+			code.push(line);
+		} else if (line.trim() === '') {
+			flushPara();
+		} else {
+			para.push(line);
+		}
+	}
+	if (code) flushCode();
+	flushPara();
+}
+
+const labelFor = state => state === 'applied' ? 'Applied' : state === 'discarded' ? 'Discarded' : 'Waiting for your review';
+
+function renderEdit(e) {
+	const card = node('div', 'edit');
+	card.dataset.id = String(e.id);
+	card.append(node('div', 'edit-path', e.path));
+	const status = node('div', 'edit-state');
+	card.append(status);
+	if (e.error) {
+		status.textContent = 'Not applied: ' + e.error;
+		status.className = 'error';
+		return card;
+	}
+	const row = node('div', 'edit-actions');
+	row.append(node('button', '', 'Review diff'), node('button', '', 'Apply'), node('button', '', 'Discard'));
+	row.children[0].type = 'button'; row.children[0].dataset.act = 'review';
+	row.children[1].type = 'button'; row.children[1].dataset.act = 'apply';
+	row.children[2].type = 'button'; row.children[2].dataset.act = 'discard';
+	card.append(row);
+	updateEdit(card, e.state);
+	return card;
+}
+
+function updateEdit(card, state) {
+	card.querySelector('.edit-state').textContent = labelFor(state);
+	const open = state === 'open';
+	card.querySelectorAll('button[data-act]').forEach(b => { b.disabled = !open; });
+}
+
+function renderItem(item) {
+	if (item.kind === 'note' || item.kind === 'error') return node('div', item.kind, item.text);
+	const wrap = node('div', 'msg ' + item.kind);
+	wrap.append(node('div', 'who', item.kind === 'user' ? 'You' : 'AI'));
+	const body = node('div', 'body');
+	if (item.text) paragraphs(body, item.text);
+	wrap.append(body);
+	for (const e of item.edits || []) wrap.append(renderEdit(e));
+	return wrap;
+}
+
+function scrollDown() { log.scrollTop = log.scrollHeight; }
+
+function applyState(m) {
+	const select = $('provider');
+	select.replaceChildren(...m.providers.map(p => { const o = node('option', '', p.label); o.value = p.id; return o; }));
+	select.value = m.provider;
+	const cur = m.providers.find(p => p.id === m.provider);
+	$('model').textContent = cur ? 'Model: ' + cur.model : '';
+	$('keyState').textContent = cur && cur.hasKey ? 'Key saved' : 'No key saved';
+	$('removeKey').disabled = !(cur && cur.hasKey);
+}
+
+window.addEventListener('message', ev => {
+	const m = ev.data;
+	switch (m.type) {
+		case 'state': applyState(m); break;
+		case 'replay': log.replaceChildren(...m.items.map(renderItem)); scrollDown(); break;
+		case 'append': log.append(renderItem(m.item)); scrollDown(); break;
+		case 'editState': {
+			const card = log.querySelector('.edit[data-id="' + Number(m.id) + '"]');
+			if (card) updateEdit(card, m.state);
+			break;
+		}
+		case 'busy': $('send').disabled = m.on; $('send').textContent = m.on ? 'Working' : 'Send'; break;
+	}
+});
+
+log.addEventListener('click', ev => {
+	const b = ev.target.closest('button[data-act]');
+	if (!b || b.disabled) return;
+	vscode.postMessage({ type: b.dataset.act, id: Number(b.closest('.edit').dataset.id) });
+});
+$('provider').addEventListener('change', e => vscode.postMessage({ type: 'provider', id: e.target.value }));
+$('setKey').addEventListener('click', () => vscode.postMessage({ type: 'setKey' }));
+$('removeKey').addEventListener('click', () => vscode.postMessage({ type: 'removeKey' }));
+$('mcp').addEventListener('click', () => vscode.postMessage({ type: 'manageMcp' }));
+$('form').addEventListener('submit', e => {
+	e.preventDefault();
+	const text = $('text').value.trim();
+	if (!text) return;
+	vscode.postMessage({ type: 'send', text, includeFile: $('includeFile').checked, useTools: $('useTools').checked });
+	$('text').value = '';
+});
+vscode.postMessage({ type: 'ready' });
+</script>
+</body>
+</html>

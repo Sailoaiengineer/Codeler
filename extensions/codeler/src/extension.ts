@@ -5,6 +5,7 @@ import { Auth } from './auth';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
+import { startAi } from './ai';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
@@ -87,6 +88,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 }
 
 export function activate(ctx: vscode.ExtensionContext) {
+	ctx.subscriptions.push(startAi(ctx));
 	const auth = new Auth(ctx.secrets);
 	currentUserId = auth.me?.id;
 	ctx.subscriptions.push(startSync(ctx, auth));
