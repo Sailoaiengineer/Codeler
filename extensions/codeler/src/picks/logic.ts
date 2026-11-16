@@ -60,9 +60,11 @@ export function statusLabel(itemId: string, installed: boolean | undefined): str
 }
 
 // What a tool probe runs. Undefined for anything that is not a listed tool, so nothing else can be run.
-export function probeSpec(toolId: string): { file: string; args: string[] } | undefined {
+export function probeSpec(toolId: string, platform: string = process.platform): { file: string; args: string[] } | undefined {
 	const tool = AI_TOOLS.find(t => t.id === toolId);
-	return tool ? { file: tool.id, args: ['--version'] } : undefined;
+	if (!tool) return undefined;
+	// On Windows the CLIs are .cmd shims that execFile cannot run without a shell, so ask `where` whether they exist.
+	return platform === 'win32' ? { file: 'where', args: [tool.id] } : { file: tool.id, args: ['--version'] };
 }
 
 export type Action =

@@ -29,7 +29,19 @@ export function checkRelativePath(p: string): string | undefined {
 	if (!p || p.includes('\0')) return 'The path is empty or invalid.';
 	if (/^([A-Za-z]:|[\\/])/.test(p)) return 'The path must be relative to the workspace.';
 	if (p.split(/[\\/]/).includes('..')) return 'The path must not contain "..".';
+	// .git and .codeler hold history and repo data; an AI edit must never write there.
+	if (p.split(/[\\/]/).some(s => /^\.(git|codeler)$/i.test(s))) return 'Codeler will not edit .git or .codeler files.';
 	return undefined;
+}
+
+// Windows runs npx, npm and other .cmd shims only through cmd.exe. Plain text only is passed there.
+export function windowsLaunch(command: string, args: string[], platform: string = process.platform): { command: string; args: string[] } | { error: string } {
+	if (platform !== 'win32' || /\.exe$/i.test(command)) return { command, args };
+	const plain = /^[\w@.\/\\:=+,-]+$/;
+	if (![command, ...args].every(s => plain.test(s))) {
+		return { error: "This MCP server's command has characters Codeler won't pass to the Windows shell. Use the full path to an .exe instead." };
+	}
+	return { command: 'cmd.exe', args: ['/d', '/s', '/c', command, ...args] };
 }
 
 // Reads fenced blocks whose info string has path=<file>. Other fenced code stays in the prose.

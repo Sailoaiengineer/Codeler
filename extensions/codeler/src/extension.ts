@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { sample } from './sample';
 import { Auth } from './auth';
-import { startChat } from './chat';
+import { attachChat, onDidChangeUnread, startChat, unreadCount } from './chat';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
@@ -33,6 +33,7 @@ class Panel implements vscode.WebviewViewProvider {
 
 function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: string, teams?: TeamClient, auth?: Auth) {
 	presenceViews.add(webview);
+	if (page === 'chat' || page === 'activity') ctx.subscriptions.push(attachChat(webview, page));
 	const media = vscode.Uri.joinPath(ctx.extensionUri, 'media');
 	webview.options = { enableScripts: true, localResourceRoots: [media] };
 	const nonce = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
@@ -176,7 +177,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 			project: team ? (vscode.workspace.getConfiguration('codeler').get<string>('projectName', '') || sample.teams[0].name) : root?.name ?? 'Open project',
 			branch: 'main',
 			people: team ? (activeTeam ? presencePeople() : sample.people) : [],
-			unread: team ? 1 : 0,
+			unread: team ? (activeTeam ? unreadCount() : 1) : 0,
 			page: teamPageActive ? 'team' : undefined,
 			account: auth.me ? { name: auth.me.name, photo: auth.me.image ?? undefined } : undefined,
 			dirty: vscode.workspace.textDocuments.some(d => d.isDirty),
@@ -251,6 +252,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 			if (pick?.id === 'out') await auth.signOut();
 		}),
 		auth.onDidChange(() => { currentUserId = auth.me?.id; pushTitlebar(); paintCursors(); }),
+		onDidChangeUnread(() => pushTitlebar()),
 		vscode.commands.registerCommand('codeler.switchLayoutPreview', async () => {
 			await vscode.workspace.getConfiguration('codeler').update('layoutPreview', mode() === 'team' ? 'solo' : 'team', vscode.ConfigurationTarget.Global);
 		}),

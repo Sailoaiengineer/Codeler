@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { callProvider, capText, DEFAULT_MODELS, McpServerConfig, parseEditBlocks, PROVIDER_LABELS, PROVIDERS, Provider, ProposedEdit, SYSTEM_PROMPT, toolName, ToolCall, ToolDef, ToolResult, Turn, validateMcpServers } from './logic';
+import { callProvider, capText, DEFAULT_MODELS, McpServerConfig, parseEditBlocks, PROVIDER_LABELS, PROVIDERS, Provider, ProposedEdit, SYSTEM_PROMPT, toolName, ToolCall, ToolDef, ToolResult, Turn, validateMcpServers, windowsLaunch } from './logic';
 
 const EDIT_SCHEME = 'codeler-ai-edit';
 const MAX_TOOL_ROUNDS = 8;
@@ -253,9 +253,13 @@ class AiView implements vscode.WebviewViewProvider, vscode.TextDocumentContentPr
 	// Env values can hold secrets, so they are passed to the child process only and never shown.
 	private async connect(s: McpServerConfig): Promise<Client> {
 		const client = new Client({ name: 'codeler', version: '0.1.0' });
-		const transport = s.url
-			? new StreamableHTTPClientTransport(new URL(s.url))
-			: new StdioClientTransport({ command: s.command ?? '', args: s.args, env: { ...getDefaultEnvironment(), ...(s.env ?? {}) }, stderr: 'ignore' });
+		let transport;
+		if (s.url) transport = new StreamableHTTPClientTransport(new URL(s.url));
+		else {
+			const launch = windowsLaunch(s.command ?? '', s.args);
+			if ('error' in launch) throw new Error(launch.error);
+			transport = new StdioClientTransport({ command: launch.command, args: launch.args, env: { ...getDefaultEnvironment(), ...(s.env ?? {}) }, stderr: 'ignore' });
+		}
 		await client.connect(transport);
 		return client;
 	}

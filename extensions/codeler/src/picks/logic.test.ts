@@ -65,7 +65,8 @@ test('every listed item has an action in both states', () => {
 test('commands are never built from user input', () => {
 	assert.equal(probeSpec('claude; rm -rf /'), undefined);
 	assert.equal(probeSpec('--help'), undefined);
-	for (const t of AI_TOOLS) assert.deepEqual(probeSpec(t.id), { file: t.id, args: ['--version'] });
+	for (const t of AI_TOOLS) assert.deepEqual(probeSpec(t.id, 'linux'), { file: t.id, args: ['--version'] });
+	for (const t of AI_TOOLS) assert.deepEqual(probeSpec(t.id, 'win32'), { file: 'where', args: [t.id] });
 	assert.equal(actionFor('tool:claude && calc', true), undefined);
 	assert.equal(actionFor('lang:ms-python.python; evil', false), undefined);
 	assert.equal(actionFor('theme:x', true), undefined);

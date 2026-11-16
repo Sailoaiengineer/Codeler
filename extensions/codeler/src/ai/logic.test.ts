@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRequest, callProvider, checkRelativePath, parseEditBlocks, parseReply, toolName, validateMcpServers, type Turn } from './logic.ts';
+import { buildRequest, callProvider, checkRelativePath, parseEditBlocks, parseReply, toolName, validateMcpServers, windowsLaunch, type Turn } from './logic.ts';
 
 const turns: Turn[] = [{ role: 'user', text: 'hi' }];
 const KEY = 'sk-test-KEY-123';
@@ -32,6 +32,10 @@ test('paths outside the workspace or with .. are rejected', () => {
 		assert.ok(checkRelativePath(p), `expected rejection for ${JSON.stringify(p)}`);
 	}
 	assert.equal(checkRelativePath('src/deep/file.ts'), undefined);
+	for (const p of ['.git/config', 'src/.git/HEAD', '.codeler/history/x', 'pkg/.CODELER/y']) {
+		assert.ok(checkRelativePath(p), `expected rejection for ${p}`);
+	}
+	assert.equal(checkRelativePath('src/.gitignore'), undefined);
 	const { edits } = parseEditBlocks('```ts path=../outside.ts\nx\n```');
 	assert.ok(edits[0].error);
 });
@@ -130,4 +134,14 @@ test('MCP config: a non-list value is an error', () => {
 test('tool names are short and plain', () => {
 	assert.equal(toolName('my server', 'list.files'), 'my_server__list_files');
 	assert.equal(toolName('s', 'x'.repeat(100)).length, 64);
+});
+
+test('Windows MCP commands run through cmd.exe only when every part is plain text', () => {
+	assert.deepEqual(windowsLaunch('npx', ['-y', '@scope/pkg@1.2.3'], 'win32'), { command: 'cmd.exe', args: ['/d', '/s', '/c', 'npx', '-y', '@scope/pkg@1.2.3'] });
+	assert.deepEqual(windowsLaunch('C:\tools\server.exe', ['a'], 'win32'), { command: 'C:\tools\server.exe', args: ['a'] });
+	assert.deepEqual(windowsLaunch('npx', ['x'], 'linux'), { command: 'npx', args: ['x'] });
+	for (const args of [['a&calc'], ['a b'], ['$(x)'], ['"q"'], ['a|b']]) {
+		assert.ok('error' in windowsLaunch('npx', args, 'win32'), `expected refusal for ${JSON.stringify(args)}`);
+	}
+	assert.ok('error' in windowsLaunch('npx & calc', [], 'win32'));
 });
