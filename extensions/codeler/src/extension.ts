@@ -9,6 +9,7 @@ import { TeamClient } from './teams/client';
 import { cleanCreate, cleanJoin } from './teams/logic';
 import { startRun } from './run';
 import { startHistory } from './history';
+import { startPicks } from './picks';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
@@ -129,6 +130,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 }
 
 export function activate(ctx: vscode.ExtensionContext) {
+	ctx.subscriptions.push(startPicks(ctx));
 	const auth = new Auth(ctx.secrets);
 	const teams = new TeamClient(auth);
 	currentUserId = auth.me?.id;

@@ -108,6 +108,12 @@
           "id": "codeler.runCommands",
           "name": "Run commands"
         }
+      ],
+      "extensions": [
+        {
+          "id": "codeler.extensionPicks",
+          "name": "Codeler picks"
+        }
       ]
     },
     "commands": [
@@ -214,6 +220,11 @@
         "command": "codeler.restoreSnapshot",
         "title": "Restore snapshot",
         "category": "Codeler"
+      },
+      {
+        "command": "codeler.picks.choose",
+        "title": "Open pick",
+        "category": "Codeler"
       }
     ],
     "configuration": {
@@ -290,6 +301,12 @@
           "command": "codeler.history",
           "when": "scmProvider == codeler",
           "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codeler.picks.choose",
+          "when": "false"
         }
       ]
     }
