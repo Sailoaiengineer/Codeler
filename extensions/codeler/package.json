@@ -108,6 +108,12 @@
           "id": "codeler.workspaces",
           "name": "Workspaces"
         }
+      ],
+      "extensions": [
+        {
+          "id": "codeler.extensionPicks",
+          "name": "Codeler picks"
+        }
       ]
     },
     "commands": [
@@ -168,6 +174,11 @@
         "command": "codeler.signOut",
         "title": "Sign out",
         "category": "Codeler"
+      },
+      {
+        "command": "codeler.picks.choose",
+        "title": "Open pick",
+        "category": "Codeler"
       }
     ],
     "configuration": {
@@ -205,6 +216,12 @@
           "command": "codeler.createTeam",
           "when": "view == codeler.workspaces",
           "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codeler.picks.choose",
+          "when": "false"
         }
       ]
     }
