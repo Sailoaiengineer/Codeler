@@ -64,3 +64,30 @@ Not checked:
 Claude should consider:
 
 - Wiring the existing project picker to set the active `codeler.projectId`; task 2 continues to use that temporary setting.
+
+## Task 2 review fixes
+
+Fixed:
+
+- Presence rows now include `isMe`; client cursor painting excludes the current user's row while retaining that avatar for presence/title-bar data.
+- Added client-side 30-second expiry filtering with a 10-second recheck, plus `presence.cleanup` and a two-minute Convex cron in `web/convex/crons.ts`.
+- Follow mode now stops only for keyboard/mouse selection changes; command and unspecified selection changes caused by follow navigation preserve following.
+- Added four contributed `codeler.person1`–`codeler.person4` colors and changed Explorer badge decorations to use valid `ThemeColor` IDs.
+- Removed disposed webviews from the broadcast set and changed Collaborators to one Follow/Following toggle per other person, with the followed row marked `aria-pressed="true"`.
+- Reused `colorFor` from presence logic instead of hashing colors again in `extension.ts`.
+- Added tests for self-cursor exclusion, fake-clock expiry filtering, and follow-mode selection semantics.
+
+Verification:
+
+- `node --test extensions/codeler/src/sync/*.test.ts extensions/codeler/src/presence/*.test.ts`: 19 passed, 0 failed.
+- Type-check passed with `--module esnext --moduleResolution bundler` against the repository VS Code declarations.
+- `bash scripts/sync-extension.sh` completed; `npm.cmd run gulp transpile-extension:codeler` completed with 0 compilation errors.
+- Compiled-load check passed for every generated JavaScript file under `out/presence` and `out/sync` using a stub `vscode` module. Transpiled test files were loaded with a test-only `.ts`-to-`.js` resolver for their source-test imports; all 19 embedded tests passed too.
+
+Not checked:
+
+- No live Convex deployment or full VSCodium UI run was available.
+
+## Claude's review of task 2 fixes
+- All 6 review items verified in code; 19 tests pass; compiled presence/sync load.
+- Claude fixed: reading `.webview` from a disposed panel/view throws in VS Code, which would have left the activity bar stuck wide after closing the Team page. Keep your own reference to a webview before registering `onDidDispose`.

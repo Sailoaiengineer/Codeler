@@ -90,53 +90,9 @@ index e8edbe1b..e0aa6df6 100644
  			// Mirrored on the workbench root for floatingPanels.css
  			this.layoutService.mainContainer.classList.toggle('activitybar-compact', this._isCompact);
  			this.element.style.setProperty('--activity-bar-width', `${this.baseWidth}px`);
-diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
-index fe7bce2f..f5187264 100644
---- a/src/vs/workbench/browser/parts/compositeBarActions.ts
-+++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
-@@ -392,6 +392,13 @@ export class CompositeBarActionViewItem extends BaseActionViewItem {
- 
- 	protected override updateLabel(): void {
- 		this.label.className = 'action-label';
-+		// Codeler: label shown beside the icon when the activity bar is expanded (hidden otherwise by CSS)
-+		let codelerLabel = this.container.querySelector<HTMLElement>(':scope > .codeler-label');
-+		if (!codelerLabel) {
-+			codelerLabel = append(this.container, $('span.codeler-label'));
-+		}
-+		codelerLabel.textContent = this.action.label;
-+		this.container.dataset.codelerLabel = this.action.label;
- 
- 		if (this.compositeBarActionItem.classNames) {
- 			this.label.classList.add(...this.compositeBarActionItem.classNames);
-diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index bfc8839c..3ec78447 100644
---- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-+++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-@@ -53,7 +53,8 @@ import { IView } from '../../../../base/browser/ui/grid/grid.js';
- import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
- import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
- import { IHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegate.js';
--import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
-+import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
-+import { installCodelerTitlebar } from './codelerTitlebar.js';
- import { safeIntl } from '../../../../base/common/date.js';
- import { IsCompactTitleBarContext, TitleBarVisibleContext } from '../../../common/contextkeys.js';
- import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
-@@ -531,6 +532,11 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
- 			this.updateToolBarDisposable.add(updateToolBar.onDidChangeMenuItems(() => this.titleBarToolBarOverflowScheduler.schedule()));
- 		}
- 
-+		// Codeler: project/branch pickers (left) and team buttons (right)
-+		if (!this.isAuxiliary && hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
-+			this._register(installCodelerTitlebar(this.leftContent, this.rightContent, this.instantiationService.invokeFunction(accessor => accessor.get(ICommandService))));
-+		}
-+
- 		// Create Toolbar Actions
- 		if (hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
- 			this.actionToolBarElement = append(this.rightContent, $('div.action-toolbar-container'));
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/codeler.css b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
 new file mode 100644
-index 00000000..6e0edff9
+index 00000000..bc72d6ee
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
 @@ -0,0 +1,39 @@
@@ -148,7 +104,7 @@ index 00000000..6e0edff9
 +	display: flex;
 +	align-items: center;
 +}
-+.monaco-workbench .activitybar .codeler-label { display: none; }
++.monaco-workbench .codeler-label { display: none; } /* only the expanded activity bar shows it; panel tabs share this code */
 +.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item > .codeler-label {
 +	display: block;
 +	margin-left: 2px;
@@ -179,6 +135,24 @@ index 00000000..6e0edff9
 +.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .action-label { flex: none; width: 40px !important; }
 +.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .badge { left: 22px; }
 +.monaco-workbench .activitybar.codeler-expanded .menubar { width: 48px; }
+diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
+index fe7bce2f..f5187264 100644
+--- a/src/vs/workbench/browser/parts/compositeBarActions.ts
++++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
+@@ -392,6 +392,13 @@ export class CompositeBarActionViewItem extends BaseActionViewItem {
+ 
+ 	protected override updateLabel(): void {
+ 		this.label.className = 'action-label';
++		// Codeler: label shown beside the icon when the activity bar is expanded (hidden otherwise by CSS)
++		let codelerLabel = this.container.querySelector<HTMLElement>(':scope > .codeler-label');
++		if (!codelerLabel) {
++			codelerLabel = append(this.container, $('span.codeler-label'));
++		}
++		codelerLabel.textContent = this.action.label;
++		this.container.dataset.codelerLabel = this.action.label;
+ 
+ 		if (this.compositeBarActionItem.classNames) {
+ 			this.label.classList.add(...this.compositeBarActionItem.classNames);
 diff --git a/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts b/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts
 new file mode 100644
 index 00000000..b425599f
@@ -387,3 +361,29 @@ index 00000000..b0f49427
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .codeler-title-left { order: 2; margin-left: 10px; }
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { width: 48px; }
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon:not(.codicon) { background-size: 28px; }
+diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+index bfc8839c..3ec78447 100644
+--- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
++++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+@@ -53,7 +53,8 @@ import { IView } from '../../../../base/browser/ui/grid/grid.js';
+ import { createInstantHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegateFactory.js';
+ import { IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
+ import { IHoverDelegate } from '../../../../base/browser/ui/hover/hoverDelegate.js';
+-import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { installCodelerTitlebar } from './codelerTitlebar.js';
+ import { safeIntl } from '../../../../base/common/date.js';
+ import { IsCompactTitleBarContext, TitleBarVisibleContext } from '../../../common/contextkeys.js';
+ import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
+@@ -531,6 +532,11 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+ 			this.updateToolBarDisposable.add(updateToolBar.onDidChangeMenuItems(() => this.titleBarToolBarOverflowScheduler.schedule()));
+ 		}
+ 
++		// Codeler: project/branch pickers (left) and team buttons (right)
++		if (!this.isAuxiliary && hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
++			this._register(installCodelerTitlebar(this.leftContent, this.rightContent, this.instantiationService.invokeFunction(accessor => accessor.get(ICommandService))));
++		}
++
+ 		// Create Toolbar Actions
+ 		if (hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
+ 			this.actionToolBarElement = append(this.rightContent, $('div.action-toolbar-container'));

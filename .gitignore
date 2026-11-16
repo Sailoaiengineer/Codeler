@@ -8,3 +8,4 @@ out/
 dist/
 .npm-cache/
 codex-*.log
+.claude/

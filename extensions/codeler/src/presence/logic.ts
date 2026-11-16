@@ -1,5 +1,5 @@
 export const TAG_COLORS = ['#3fbf5c', '#2684f5', '#f2842b', '#b26bd1'];
-export type Presence = { userId: string; name: string; image?: string | null; path: string; line: number; character: number; selection: { startLine: number; startCharacter: number; endLine: number; endCharacter: number } };
+export type Presence = { userId: string; name: string; image?: string | null; path: string; line: number; character: number; lastSeen: number; isMe?: boolean; selection: { startLine: number; startCharacter: number; endLine: number; endCharacter: number } };
 
 export function colorFor(userId: string) {
 	let hash = 0; for (const c of userId) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
@@ -14,8 +14,13 @@ export function fileDecorations(rows: Presence[]) {
 	for (const row of rows) { const initials = row.name.split(/\s+/).map(s => s[0] ?? '').join('').slice(0, 2).toUpperCase(); const values = out.get(row.path) ?? []; values.push({ initials, color: colorFor(row.userId) }); out.set(row.path, values); }
 	return out;
 }
+export function cursorRows(rows: Presence[], me?: string) { return rows.filter(row => !row.isMe && row.userId !== me); }
+export function recentRows(rows: Presence[], now = Date.now(), maxAge = 30_000) { return rows.filter(row => row.lastSeen >= now - maxAge); }
 export function followTarget(current: { userId: string; active: boolean } | undefined, action: 'follow' | 'stop', userId?: string) {
 	if (action === 'stop') return undefined;
 	if (!userId) return current;
 	return { userId, active: true };
+}
+export function followSelection(current: { userId: string; active: boolean } | undefined, kind?: 'keyboard' | 'mouse' | 'command') {
+	return kind === 'keyboard' || kind === 'mouse' ? undefined : current;
 }

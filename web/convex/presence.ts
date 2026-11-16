@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireProjectMember } from "./access";
 
@@ -30,13 +30,22 @@ export const heartbeat = mutation({
 export const list = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
-    await requireProjectMember(ctx, projectId);
+    const { user } = await requireProjectMember(ctx, projectId);
     const cutoff = Date.now() - 30_000;
     const rows = await ctx.db.query("presence").withIndex("by_project", q => q.eq("projectId", projectId)).collect();
     const project = await ctx.db.get(projectId);
     if (!project) return [];
     const members = await ctx.db.query("members").withIndex("by_team_status", q => q.eq("teamId", project.teamId).eq("status", "active")).collect();
     const byUser = new Map(members.map(m => [m.userId, m]));
-    return rows.filter(r => r.lastSeen >= cutoff).flatMap(r => { const m = byUser.get(r.userId); return m ? [{ userId: r.userId, name: m.name, image: m.image ?? null, path: r.path, line: r.line, character: r.character, selection: r.selection, lastSeen: r.lastSeen }] : []; });
+    return rows.filter(r => r.lastSeen >= cutoff).flatMap(r => { const m = byUser.get(r.userId); return m ? [{ userId: r.userId, name: m.name, image: m.image ?? null, path: r.path, line: r.line, character: r.character, selection: r.selection, lastSeen: r.lastSeen, isMe: r.userId === user._id }] : []; });
+  },
+});
+
+export const cleanup = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - 2 * 60_000;
+    const rows = await ctx.db.query("presence").withIndex("by_project").collect();
+    for (const row of rows) if (row.lastSeen < cutoff) await ctx.db.delete(row._id);
   },
 });

@@ -4,19 +4,23 @@ import { sample } from './sample';
 import { Auth } from './auth';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
+import { colorFor, cursorRows } from './presence/logic';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
+let followingUserId: string | undefined;
+let currentUserId: string | undefined;
 let follow: (userId: string) => void = () => undefined;
 let stopFollowing: () => void = () => undefined;
-const presencePeople = () => presenceRows.map(p => ({ name: p.name, initials: p.name.split(/\s+/).map(s => s[0] ?? '').join('').slice(0, 2).toUpperCase(), color: colorFor(p.userId), photo: p.image ?? undefined, online: true, file: p.path, cursorLine: p.line + 1 }));
-const colorFor = (id: string) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ['#3fbf5c', '#2684f5', '#f2842b', '#b26bd1'][h % 4]; };
+const presencePeople = () => presenceRows.map(p => ({ userId: p.userId, isMe: p.isMe, name: p.name, initials: p.name.split(/\s+/).map(s => s[0] ?? '').join('').slice(0, 2).toUpperCase(), color: colorFor(p.userId), photo: p.image ?? undefined, online: true, file: p.path, cursorLine: p.line + 1 }));
 
 // Panels are plain HTML files in media/; each gets the shared stylesheet and a strict CSP.
 class Panel implements vscode.WebviewViewProvider {
 	constructor(private ctx: vscode.ExtensionContext, private page: string) { }
 	resolveWebviewView(view: vscode.WebviewView) {
-		render(this.ctx, view.webview, this.page);
+		const webview = view.webview;
+		render(this.ctx, webview, this.page);
+		view.onDidDispose(() => presenceViews.delete(webview));
 	}
 }
 
@@ -62,7 +66,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 	if (!editor) return;
 	if (presenceRows.length) {
 		const visible = new Set<string>();
-		for (const p of presenceRows) {
+		for (const p of cursorRows(presenceRows, currentUserId)) {
 			const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 			const file = root ? path.relative(root, editor.document.uri.fsPath).split(path.sep).join('/') : '';
 			if (p.path !== file) continue;
@@ -84,6 +88,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 
 export function activate(ctx: vscode.ExtensionContext) {
 	const auth = new Auth(ctx.secrets);
+	currentUserId = auth.me?.id;
 	ctx.subscriptions.push(startSync(ctx, auth));
 	const projectId = () => Boolean(vscode.workspace.getConfiguration('codeler').get<string>('projectId', '') && auth.me);
 	for (const [id, page] of [['codeler.chat', 'chat'], ['codeler.activity', 'activity'], ['codeler.collaborators', 'collaborators'], ['codeler.workspaces', 'workspaces']])
@@ -130,13 +135,13 @@ export function activate(ctx: vscode.ExtensionContext) {
 		paintCursors();
 	};
 	const presenceBridge = { onRows: (rows: PresenceRow[]) => {
-		presenceRows = rows; for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), rows });
+		presenceRows = rows; for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), rows, followingUserId });
 		pushTitlebar(); paintCursors(); decorationEvent?.fire(undefined);
 	}, follow: (userId: string) => undefined, stopFollowing: () => undefined };
 	decorationEvent = new vscode.EventEmitter<vscode.Uri | undefined>();
 	const presence = startPresence(ctx, auth, presenceBridge); ctx.subscriptions.push(presence);
-	follow = (userId: string) => presenceBridge.follow(userId);
-	stopFollowing = () => presenceBridge.stopFollowing();
+	follow = (userId: string) => { followingUserId = userId; presenceBridge.follow(userId); for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), followingUserId }); };
+	stopFollowing = () => { followingUserId = undefined; presenceBridge.stopFollowing(); for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), followingUserId }); };
 	(ctx.subscriptions as vscode.Disposable[]).push(vscode.window.registerFileDecorationProvider({
 		onDidChangeFileDecorations: decorationEvent.event,
 		provideFileDecoration(uri, _token) { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; return presenceDecorationProvider(presenceRows, u => root ? path.relative(root, u.fsPath).split(path.sep).join('/') : '').provideFileDecoration(uri, _token); },
@@ -171,8 +176,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 			teamPanel = vscode.window.createWebviewPanel('codeler.team', 'Create your team', vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(ctx.extensionUri, 'media')] });
 			teamPanel.iconPath = new vscode.ThemeIcon('organization');
 			teamPanel.onDidChangeViewState(e => expand(e.webviewPanel.active));
-			teamPanel.onDidDispose(() => { teamPanel = undefined; expand(false); });
-			render(ctx, teamPanel.webview, 'team');
+			const teamWebview = teamPanel.webview; // a disposed panel's .webview throws, so keep our own reference
+			teamPanel.onDidDispose(() => { presenceViews.delete(teamWebview); teamPanel = undefined; expand(false); });
+			render(ctx, teamWebview, 'team');
 		}),
 		vscode.commands.registerCommand('codeler.share', () => vscode.window.showInformationMessage('Sharing your preview works once teams are connected.')),
 		vscode.commands.registerCommand('codeler.run', () => vscode.commands.executeCommand('workbench.action.debug.run')),
@@ -190,7 +196,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 			const pick = await vscode.window.showQuickPick([{ label: '$(sign-out) Sign out', id: 'out' }], { placeHolder: `Signed in as ${auth.me.email}` });
 			if (pick?.id === 'out') await auth.signOut();
 		}),
-		auth.onDidChange(() => pushTitlebar()),
+		auth.onDidChange(() => { currentUserId = auth.me?.id; pushTitlebar(); paintCursors(); }),
 		vscode.commands.registerCommand('codeler.switchLayoutPreview', async () => {
 			await vscode.workspace.getConfiguration('codeler').update('layoutPreview', mode() === 'team' ? 'solo' : 'team', vscode.ConfigurationTarget.Global);
 		}),

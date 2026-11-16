@@ -20,6 +20,12 @@
         "path": "./themes/codeler-dark.json"
       }
     ],
+    "colors": [
+      { "id": "codeler.person1", "description": "Codeler collaborator color 1", "defaults": { "dark": "#3fbf5c", "light": "#3fbf5c", "highContrast": "#3fbf5c" } },
+      { "id": "codeler.person2", "description": "Codeler collaborator color 2", "defaults": { "dark": "#2684f5", "light": "#2684f5", "highContrast": "#2684f5" } },
+      { "id": "codeler.person3", "description": "Codeler collaborator color 3", "defaults": { "dark": "#f2842b", "light": "#f2842b", "highContrast": "#f2842b" } },
+      { "id": "codeler.person4", "description": "Codeler collaborator color 4", "defaults": { "dark": "#b26bd1", "light": "#b26bd1", "highContrast": "#b26bd1" } }
+    ],
     "configurationDefaults": {
       "workbench.colorTheme": "Codeler Dark",
       "editor.fontFamily": "'JetBrains Mono', Consolas, 'Courier New', monospace",
