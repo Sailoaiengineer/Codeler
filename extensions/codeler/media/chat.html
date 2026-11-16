@@ -9,9 +9,14 @@
 <script type="application/json" id="data">{{data}}</script>
 <div class="chat">
 	<div class="msgs" id="msgs" role="log" aria-live="polite"></div>
+	<div id="mentions" role="listbox" hidden></div>
 	<form class="composer" id="form">
 		<div class="box">
 			<input id="text" placeholder="Type a message..." aria-label="Message" autocomplete="off">
+			<button type="button" class="icon-btn" aria-label="Attach a file" id="attach">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L16 6.5"/></svg>
+			</button>
+			<input type="file" id="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,text/plain,application/pdf,application/zip">
 			<button type="button" class="icon-btn" aria-label="Emoji" id="emoji">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg>
 			</button>
@@ -20,6 +25,7 @@
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 4l17 8-17 8 3-8-3-8z"/><path d="M7 12h14"/></svg>
 		</button>
 	</form>
+	<div id="status" role="status"></div>
 	<section class="online">
 		<h3>Currently online</h3>
 		<div class="row" id="online"></div>
@@ -27,23 +33,102 @@
 </div>
 <script nonce="{{nonce}}" src="{{js}}"></script>
 <script nonce="{{nonce}}">
+const MAX_FILE = 10 * 1024 * 1024;
 const msgs = document.getElementById('msgs');
-const add = m => {
-	const p = person(m.who);
-	msgs.append(el('div', { class: 'msg' }, avatar(p),
+const form = document.getElementById('form');
+const input = document.getElementById('text');
+const fileInput = document.getElementById('file');
+const statusLine = document.getElementById('status');
+const mentionBox = document.getElementById('mentions');
+let live = false, members = [], file = null, picks = [], pick = 0, span = null;
+
+const showStatus = text => { statusLine.textContent = text; };
+const row = m => {
+	const p = personOf(m);
+	const link = m.attachment && m.attachment.url;
+	return el('div', { class: 'msg' }, avatar(p),
 		el('div', {}, el('div', {}, el('span', { class: 'who' }, p.name), el('span', { class: 'time' }, m.time)),
-			el('div', { class: 'text' }, richText(m.text)))));
+			el('div', { class: 'text' }, richText(m.text)),
+			link ? el('a', { onclick: () => vscode.postMessage({ type: 'chatOpenFile', url: link }) }, m.attachment.name + ' (' + sizeLabel(m.attachment.size) + ')') : null));
 };
-data.chat.forEach(add);
-msgs.scrollTop = msgs.scrollHeight;
+const drawChat = list => { msgs.replaceChildren(...list.map(row)); msgs.scrollTop = msgs.scrollHeight; };
+drawChat(data.chat);
+
 const drawOnline = people => { const online = document.getElementById('online'); online.replaceChildren(...people.filter(p => p.online).map(p => el('div', { class: 'person' }, avatar(p, true), p.name))); };
 drawOnline(data.people);
-onCodelerMessage(m => { if (m.type === 'presence') drawOnline(m.people); });
+
+// @ mention autocomplete: the list only opens while the caret is on an @word.
+function closeMentions() { picks = []; span = null; mentionBox.hidden = true; mentionBox.replaceChildren(); }
+function showMentions() {
+	const caret = input.selectionStart ?? input.value.length;
+	const match = input.value.slice(0, caret).match(/(^|\s)@([^@\n]{0,40})$/);
+	if (!live || !match) return closeMentions();
+	const q = match[2].toLowerCase();
+	span = { start: caret - match[2].length - 1, end: caret };
+	picks = members.filter(m => m.name.toLowerCase().startsWith(q)).slice(0, 6);
+	if (!picks.length) return closeMentions();
+	pick = Math.min(pick, picks.length - 1);
+	mentionBox.style.cssText = 'margin:0 12px 6px;padding:4px;border-radius:6px;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-widget-border,#444);color:var(--vscode-foreground)';
+	mentionBox.replaceChildren(...picks.map((m, i) => el('div', { role: 'option', style: 'padding:4px 8px;cursor:pointer;' + (i === pick ? 'font-weight:600;' : ''), onmousedown: e => { e.preventDefault(); choose(i); } }, m.name)));
+	mentionBox.hidden = false;
+}
+function choose(i) {
+	const m = picks[i];
+	if (!m || !span) return;
+	const insert = '@' + m.name + ' ';
+	input.value = input.value.slice(0, span.start) + insert + input.value.slice(span.end);
+	const at = span.start + insert.length;
+	input.setSelectionRange(at, at);
+	closeMentions();
+	input.focus();
+}
+input.addEventListener('input', () => { pick = 0; showMentions(); });
+input.addEventListener('keydown', e => {
+	if (!picks.length) return;
+	if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); pick = (pick + (e.key === 'ArrowDown' ? 1 : picks.length - 1)) % picks.length; showMentions(); }
+	else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); choose(pick); }
+	else if (e.key === 'Escape') { e.preventDefault(); closeMentions(); }
+});
+
+// Browsers report some types oddly (zip on Windows, plain text with no type), so map them before the extension checks.
+function typeOf(f) {
+	if (f.type === 'application/x-zip-compressed') return 'application/zip';
+	if (!f.type && f.name.endsWith('.txt')) return 'text/plain';
+	return f.type;
+}
+document.getElementById('attach').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+	const f = fileInput.files[0];
+	file = null;
+	if (!f) return;
+	if (f.size > MAX_FILE) { fileInput.value = ''; return showStatus('Files can be up to 10 MB.'); }
+	file = { name: f.name, type: typeOf(f), size: f.size, blob: f };
+	showStatus('Attached ' + f.name + ' (' + sizeLabel(f.size) + '). Send to share it.');
+});
+
 document.getElementById('form').addEventListener('submit', e => {
 	e.preventDefault();
-	vscode.postMessage({ type: 'notReady', text: 'Sending messages' });
+	if (!live) { vscode.postMessage({ type: 'notReady', text: 'Sending messages' }); return; }
+	const text = input.value.trim();
+	if (!text && !file) return;
+	const sending = file;
+	const send = (extra) => vscode.postMessage({ type: 'chatSend', text, ...extra });
+	if (sending) {
+		const reader = new FileReader();
+		reader.onload = () => send({ file: { name: sending.name, type: sending.type, data: String(reader.result).split(',')[1] } });
+		reader.readAsDataURL(sending.blob);
+	} else send({});
+	input.value = ''; file = null; fileInput.value = ''; closeMentions(); showStatus('');
 });
 document.getElementById('emoji').addEventListener('click', () => vscode.postMessage({ type: 'notReady', text: 'The emoji picker' }));
+
+onCodelerMessage(m => {
+	if (m.type === 'presence') drawOnline(m.people);
+	if (m.type === 'chat') { live = true; members = m.members; drawChat(m.messages); }
+	if (m.type === 'live' && !m.on) { live = false; members = []; closeMentions(); drawChat(data.chat); }
+	if (m.type === 'error') showStatus(m.text);
+});
+vscode.postMessage({ type: 'ready' });
 </script>
 </body>
 </html>

@@ -10,11 +10,19 @@
 <div class="list" id="list" role="log"></div>
 <script nonce="{{nonce}}" src="{{js}}"></script>
 <script nonce="{{nonce}}">
-for (const a of data.activity) {
-	const p = person(a.who);
-	document.getElementById('list').append(el('div', { class: 'item' }, avatar(p),
-		el('div', { class: 'grow' }, el('div', {}, el('b', {}, p.name), ' ', a.text), el('div', { class: 'sub' }, a.time))));
-}
+const list = document.getElementById('list');
+const row = a => {
+	const p = personOf(a);
+	return el('div', { class: 'item' }, avatar(p),
+		el('div', { class: 'grow' }, el('div', {}, el('b', {}, p.name), ' ', a.text), el('div', { class: 'sub' }, a.time)));
+};
+const draw = items => list.replaceChildren(...items.map(row));
+draw(data.activity);
+onCodelerMessage(m => {
+	if (m.type === 'activity') draw(m.items);
+	if (m.type === 'live' && !m.on) draw(data.activity);
+});
+vscode.postMessage({ type: 'ready' });
 </script>
 </body>
 </html>

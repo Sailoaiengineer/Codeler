@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { sample } from './sample';
 import { Auth } from './auth';
+import { startChat } from './chat';
 import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
@@ -133,6 +134,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(startPicks(ctx));
 	const auth = new Auth(ctx.secrets);
 	const teams = new TeamClient(auth);
+	ctx.subscriptions.push(startChat(ctx, auth));
 	currentUserId = auth.me?.id;
 	ctx.subscriptions.push(startSync(ctx, auth));
 	ctx.subscriptions.push(startRun(ctx));
