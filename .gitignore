@@ -9,3 +9,4 @@ dist/
 .npm-cache/
 codex-*.log
 .claude/
+codex-parallel.log
