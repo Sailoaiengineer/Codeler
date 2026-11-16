@@ -46,14 +46,15 @@ async function sendChat(webview: vscode.Webview, text: string, file: FromPanel['
 	const sent = admitSend(sentAt, Date.now());
 	if (!sent) return fail('Slow down: 30 messages a minute is the limit.');
 	sentAt = sent;
-	const bytes = file ? Buffer.from(file.data, 'base64') : undefined;
+	// atob, not Buffer: Buffer's typing with this tsconfig's lib set does not accept a base64 string.
+	const bytes = file ? Uint8Array.from(atob(file.data), c => c.charCodeAt(0)) : undefined;
 	const fileProblem = file && bytes ? fileError({ type: file.type, size: bytes.byteLength }) : undefined;
 	if (fileProblem) return fail(fileProblem);
 	try {
 		const messageId = await rpc.mutation('chat:send', { projectId, text: body });
 		if (file && bytes) {
 			const uploadUrl: string = await rpc.mutation('chat:generateUploadUrl', { projectId });
-			const res = await fetch(uploadUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: new Uint8Array(bytes) });
+			const res = await fetch(uploadUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: bytes });
 			if (!res.ok) throw new Error('upload failed');
 			const { storageId } = await res.json() as { storageId: string };
 			await rpc.mutation('chat:attach', { projectId, messageId, storageId, name: file.name });
