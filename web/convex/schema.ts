@@ -107,7 +107,8 @@ export default defineSchema({
       storageId: v.id("_storage"), name: v.string(), type: v.string(), size: v.number(),
     })),
     createdAt: v.number(),
-  }).index("by_project_created", ["projectId", "createdAt"]),
+  }).index("by_project_created", ["projectId", "createdAt"])
+    .index("by_attachment", ["attachment.storageId"]),
 
   activity: defineTable({
     projectId: v.id("projects"),

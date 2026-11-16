@@ -100,6 +100,12 @@ export const attach = mutation({
     if (!message || message.projectId !== projectId) throw new ConvexError("That message is gone.");
     if (message.userId !== user._id) throw new ConvexError("You can only attach files to your own messages.");
     if (message.attachment) throw new ConvexError("This message already has a file.");
+    // Uploads are not tied to a user, so any signed-in member could otherwise attach someone else's stored file.
+    // A file must be fresh and not already attached to another message.
+    const taken = await ctx.db.query("messages").withIndex("by_attachment", (q) => q.eq("attachment.storageId", storageId)).first();
+    if (taken) throw new ConvexError("That file is already attached to a message.");
+    const stored = await ctx.db.system.get(storageId);
+    if (!stored || Date.now() - stored._creationTime > 10 * 60 * 1000) throw new ConvexError("The upload expired. Attach the file again.");
     const meta = await ctx.storage.getMetadata(storageId);
     if (!meta) throw new ConvexError("The upload didn't finish. Try again.");
     const type = (meta.contentType ?? "").split(";")[0].trim().toLowerCase();
