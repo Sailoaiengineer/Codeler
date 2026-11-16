@@ -6,3 +6,5 @@ web/convex/_generated/
 .env*.local
 out/
 dist/
+.npm-cache/
+codex-*.log
