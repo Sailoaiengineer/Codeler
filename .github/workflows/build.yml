@@ -44,6 +44,7 @@ jobs:
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
           git -C vscodium apply ../patches/vscodium-build.patch
+          python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build Windows installer
         run: bash ./vscodium/dev/build.sh -p
@@ -104,6 +105,7 @@ jobs:
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
           git -C vscodium apply ../patches/vscodium-build.patch
+          python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build macOS package
         run: bash ./vscodium/dev/build.sh -p
@@ -136,6 +138,7 @@ jobs:
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
           git -C vscodium apply ../patches/vscodium-build.patch
+          python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build Linux package
         run: bash ./vscodium/dev/build.sh -p
