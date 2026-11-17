@@ -1,5 +1,6 @@
 // Codeler version history: the "Changes" view, snapshot commands and the editor gutter. Logic lives in ./logic.
 import * as vscode from 'vscode';
+import { recordActivity } from '../activity';
 import { Change, currentFiles, diff, listSnapshots, readBlob, relativeTime, restoreSnapshot, saveSnapshot, Snapshot } from './logic';
 
 const SCHEME = 'codeler-history';
@@ -80,6 +81,7 @@ export function startHistory(_ctx: vscode.ExtensionContext): vscode.Disposable {
 		}
 		try {
 			await saveSnapshot(root, message);
+			void recordActivity('snapshot', message);
 			sc.inputBox.value = '';
 			vscode.window.setStatusBarMessage(`Snapshot '${message}' saved`, 3000);
 		} catch (e) {
