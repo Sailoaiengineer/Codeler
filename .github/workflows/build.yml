@@ -9,6 +9,9 @@ permissions:
   contents: read
 
 env:
+  APP_NAME: Codeler
+  BINARY_NAME: codeler
+  ORG_NAME: Codeler
   VSCODIUM_COMMIT: ca7f7b44b5e5c3faa663f6cdc043998f71936653
 
 jobs:
