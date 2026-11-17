@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allowedVerificationUrl, pollDeviceToken, storeSessionToken } from './auth-logic.ts';
+import { allowedVerificationUrl, pollDeviceToken, sessionUrlAllowed, storeSessionToken } from './auth-logic.ts';
+
+test('session URLs must be https or a local http address', () => {
+	assert.equal(sessionUrlAllowed('https://codeler.example'), true);
+	assert.equal(sessionUrlAllowed('http://localhost:3000'), true);
+	assert.equal(sessionUrlAllowed('http://127.0.0.1:3000'), true);
+	assert.equal(sessionUrlAllowed('http://codeler.example'), false);
+	assert.equal(sessionUrlAllowed('http://localhost.evil.example'), false);
+	assert.equal(sessionUrlAllowed('ftp://codeler.example'), false);
+	assert.equal(sessionUrlAllowed('not a url'), false);
+});
 
 const clock = () => {
 	let time = 0;

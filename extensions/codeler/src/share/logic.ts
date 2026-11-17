@@ -33,3 +33,38 @@ export function nextState(current: ShareState, event: 'start' | 'started' | 'sto
 }
 
 export const sharePorts = commonPorts;
+
+// Title from the first part of an HTML page. Control characters are removed and the text is kept short.
+export function parseTitle(html: string): string | undefined {
+	const match = html.slice(0, 20000).match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+	const title = match?.[1].replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+	return title || undefined;
+}
+
+// What the consent dialog shows: the page title, else the Server header, else a plain fallback.
+export function describeService(info: { title?: string; server?: string } | undefined): string {
+	if (info?.title) return `"${info.title}"`;
+	if (info?.server) return `a server (${info.server.slice(0, 80)})`;
+	return 'an unknown service';
+}
+
+export const defaultShareMinutes = 120;
+
+// Keeps the codeler.share.maxMinutes setting in a sane range.
+export function shareMinutes(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) ? Math.min(1440, Math.max(1, Math.floor(value))) : defaultShareMinutes;
+}
+
+export function shouldAutoStop(startedAt: number, now: number, maxMinutes: number): boolean {
+	return now - startedAt >= maxMinutes * 60_000;
+}
+
+// Only absolute Windows folders from PATH count. Relative entries (such as "." or "bin") would resolve against the open folder.
+export function cloudflaredCandidates(pathValue: string, programFiles: string[]): string[] {
+	const folders = [...pathValue.split(';'), ...programFiles.map(folder => `${folder}\\cloudflared`)];
+	const files = folders
+		.map(folder => folder.trim().replace(/^"(.*)"$/, '$1'))
+		.filter(folder => /^[A-Za-z]:[\\/]/.test(folder) || folder.startsWith('\\\\'))
+		.map(folder => `${folder.replace(/[\\/]+$/, '')}\\cloudflared.exe`);
+	return [...new Set(files)];
+}

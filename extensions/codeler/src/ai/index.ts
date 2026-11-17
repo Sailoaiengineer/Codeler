@@ -5,7 +5,7 @@ import { isSafeRelativePath, safePath } from '../sync/safety';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { callProvider, capText, DEFAULT_MODELS, McpServerConfig, parseEditBlocks, PROVIDER_LABELS, PROVIDERS, Provider, ProposedEdit, SYSTEM_PROMPT, toolName, ToolCall, ToolDef, ToolResult, Turn, validateMcpServers, windowsLaunch } from './logic';
+import { callProvider, capText, DEFAULT_MODELS, mcpSetupLine, McpServerConfig, parseEditBlocks, PROVIDER_LABELS, PROVIDERS, Provider, ProposedEdit, SYSTEM_PROMPT, toolName, ToolCall, ToolDef, ToolResult, Turn, validateMcpServers, windowsLaunch } from './logic';
 
 const EDIT_SCHEME = 'codeler-ai-edit';
 const MAX_TOOL_ROUNDS = 8;
@@ -305,8 +305,9 @@ export function startAi(ctx: vscode.ExtensionContext): vscode.Disposable {
 		vscode.commands.registerCommand('codeler.ai.manageMcp', () => vscode.commands.executeCommand('workbench.action.openSettings', 'codeler.mcpServers')),
 		vscode.commands.registerCommand('codeler.mcp.start', async () => {
 			if (!root) return vscode.window.showWarningMessage('Open a folder first.').then(() => undefined);
-			const server = path.join(ctx.extensionPath, 'mcp', 'server.js');
-			await vscode.env.clipboard.writeText(`claude mcp add codeler -- node "${server}" "${root}"`);
+			const setup = mcpSetupLine(path.join(ctx.extensionPath, 'mcp', 'server.js'), root);
+			if ('error' in setup) return void vscode.window.showErrorMessage(setup.error);
+			await vscode.env.clipboard.writeText(setup.line);
 			void vscode.window.showInformationMessage('Copied the Codeler MCP setup line. Paste it into a terminal to add the server to Claude Code. For Codex, use codex mcp add with the same arguments.');
 		}),
 		{ dispose: () => void view.closeClients() },

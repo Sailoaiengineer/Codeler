@@ -7,6 +7,14 @@ export function allowedVerificationUrl(value: string, site: string): boolean {
 	try { return new URL(value, site).origin === new URL(site).origin; } catch { return false; }
 }
 
+// The session token and Convex calls go only to https, or to this computer's own http server.
+export function sessionUrlAllowed(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' || (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
+	} catch { return false; }
+}
+
 export async function pollDeviceToken(
 	request: () => Promise<DeviceTokenResponse>,
 	options: { intervalMs: number; expiresInMs: number; sleep?: (ms: number) => Promise<void>; now?: () => number; cancelled?: () => boolean },

@@ -3,9 +3,25 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkDocument } from './tools';
 import { recordActivity } from '../activity';
-import { detectRunCommand, RunCommand, RunConfig, validateRunConfig } from './logic';
+import { detectRunCommand, isCommandTrusted, RunCommand, RunConfig, trustCommand, validateRunConfig } from './logic';
 
 const configName = '.codeler/run.json';
+const trustKey = 'codeler.trustedRunCommands';
+
+// Commands from a project file need one approval per exact command text in this workspace.
+async function confirmRun(ctx: vscode.ExtensionContext, command: RunCommand): Promise<boolean> {
+	const trusted = ctx.workspaceState.get<string[]>(trustKey, []);
+	if (isCommandTrusted(trusted, command.command)) return true;
+	const choice = await vscode.window.showWarningMessage('Run this command from the project?', { modal: true, detail: command.command }, 'Run');
+	if (choice !== 'Run') return false;
+	await ctx.workspaceState.update(trustKey, trustCommand(trusted, command.command));
+	return true;
+}
+
+// Commands typed in the Run & Debug view are trusted when they are saved.
+async function trustTyped(ctx: vscode.ExtensionContext, command: RunCommand): Promise<void> {
+	await ctx.workspaceState.update(trustKey, trustCommand(ctx.workspaceState.get<string[]>(trustKey, []), command.command));
+}
 type Item = RunCommand & { contextValue: string };
 
 class CommandsProvider implements vscode.TreeDataProvider<Item> {
@@ -84,7 +100,8 @@ async function configWithDefault(): Promise<RunConfig> {
 
 let terminal: vscode.Terminal | undefined;
 let running = false;
-async function runCommand(command: RunCommand): Promise<void> {
+async function runCommand(ctx: vscode.ExtensionContext, command: RunCommand): Promise<void> {
+	if (!await confirmRun(ctx, command)) return;
 	if (!terminal || terminal.exitStatus !== undefined) terminal = vscode.window.createTerminal(`Codeler: ${command.name}`);
 	terminal.show(true);
 	if (running) { terminal.sendText('\u0003', false); await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -114,11 +131,11 @@ export function startRun(ctx: vscode.ExtensionContext): vscode.Disposable {
 			const config = await configWithDefault();
 			const command = config.commands.find(item => item.name === config.default) ?? config.commands[0];
 			if (!command) return void vscode.window.showErrorMessage('Codeler could not find a run command for this project.');
-			await runCommand(command);
+			await runCommand(ctx, command);
 		}),
-		vscode.commands.registerCommand('codeler.runCommand', (item: RunCommand) => runCommand(item)),
-		vscode.commands.registerCommand('codeler.addRunCommand', async () => { const item = await inputCommand(); if (!item) return; const config = await readConfig(); config.commands.push(item); if (!config.default) config.default = item.name; await saveConfig(config); provider.refresh(); }),
-		vscode.commands.registerCommand('codeler.editRunCommand', async (item: RunCommand) => { const replacement = await inputCommand(item); if (!replacement) return; const config = await readConfig(); const index = config.commands.findIndex(value => value.name === item.name); if (index < 0) return; config.commands[index] = replacement; if (config.default === item.name) config.default = replacement.name; await saveConfig(config); provider.refresh(); }),
+		vscode.commands.registerCommand('codeler.runCommand', (item: RunCommand) => runCommand(ctx, item)),
+		vscode.commands.registerCommand('codeler.addRunCommand', async () => { const item = await inputCommand(); if (!item) return; await trustTyped(ctx, item); const config = await readConfig(); config.commands.push(item); if (!config.default) config.default = item.name; await saveConfig(config); provider.refresh(); }),
+		vscode.commands.registerCommand('codeler.editRunCommand', async (item: RunCommand) => { const replacement = await inputCommand(item); if (!replacement) return; await trustTyped(ctx, replacement); const config = await readConfig(); const index = config.commands.findIndex(value => value.name === item.name); if (index < 0) return; config.commands[index] = replacement; if (config.default === item.name) config.default = replacement.name; await saveConfig(config); provider.refresh(); }),
 		vscode.commands.registerCommand('codeler.deleteRunCommand', async (item: RunCommand) => { const config = await readConfig(); config.commands = config.commands.filter(value => value.name !== item.name); if (config.default === item.name) delete config.default; await saveConfig(config); provider.refresh(); }),
 		vscode.commands.registerCommand('codeler.setDefaultRunCommand', async (item: RunCommand) => { const config = await readConfig(); config.default = item.name; await saveConfig(config); provider.refresh(); })
 	];

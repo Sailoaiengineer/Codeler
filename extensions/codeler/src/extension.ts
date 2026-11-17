@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { sample } from './sample';
-import { Auth } from './auth';
+import { Auth, convexUrl } from './auth';
 import { attachChat, onDidChangeUnread, startChat, unreadCount } from './chat';
 import { startSync } from './sync';
 import { isSafeRelativePath, safePath } from './sync/safety';
@@ -43,7 +43,7 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 	const read = (f: string) => vscode.workspace.fs.readFile(vscode.Uri.joinPath(media, f)).then(b => Buffer.from(b).toString("utf8"));
 	// Team avatars are served from the Convex deployment, so its origin is allowed for images.
 	let convexOrigin = '';
-	try { convexOrigin = new URL(vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '')).origin; } catch { /* not configured yet */ }
+	try { convexOrigin = new URL(convexUrl()).origin; } catch { /* not configured yet */ }
 	read(page + '.html').then(html => {
 		webview.html = html
 			.replaceAll('{{csp}}', `default-src 'none'; img-src ${webview.cspSource} data: ${convexOrigin}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';`)

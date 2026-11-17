@@ -1,6 +1,6 @@
 import { ConvexHttpClient } from 'convex/browser';
 import * as vscode from 'vscode';
-import { Auth } from '../auth';
+import { Auth, convexUrl } from '../auth';
 
 export type TeamProject = { id: string; name: string };
 export type TeamMine = { teamId: string; name: string; role: string; status: string; waiting?: number; projects?: TeamProject[]; joinCode?: string; imageUrl?: string | null };
@@ -21,7 +21,7 @@ export class TeamClient {
 	constructor(private readonly auth: Auth) { }
 
 	private async get(): Promise<ConvexHttpClient> {
-		const url = vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '').replace(/\/+$/, '');
+		const url = convexUrl();
 		if (!url) throw new Error('Codeler backend is not configured.');
 		if (!this.client || this.url !== url) {
 			this.client = new ConvexHttpClient(url);
