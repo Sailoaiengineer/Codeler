@@ -193,7 +193,7 @@ export function validateMcpServers(raw: unknown): { servers: McpServerConfig[]; 
 	if (!Array.isArray(raw)) return { servers, errors: ['codeler.mcpServers must be a list.'] };
 	const seen = new Set<string>();
 	raw.forEach((entry, i) => {
-		const fail = (msg: string) => errors.push(`MCP server ${i + 1}: ${msg}`);
+		const fail = (msg: string): void => { errors.push(`MCP server ${i + 1}: ${msg}`); };
 		if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return fail('must be an object.');
 		const e = entry as Record<string, unknown>;
 		const name = e.name;

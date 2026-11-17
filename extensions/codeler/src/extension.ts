@@ -221,7 +221,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	const presenceBridge = { onRows: (rows: PresenceRow[]) => {
 		presenceRows = rows; for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), rows, followingUserId });
 		pushTitlebar(); paintCursors(); decorationEvent?.fire(undefined);
-	}, follow: (userId: string) => undefined, stopFollowing: () => undefined };
+	}, follow: (_userId: string) => undefined, stopFollowing: () => undefined };
 	decorationEvent = new vscode.EventEmitter<vscode.Uri | undefined>();
 	const presence = startPresence(ctx, auth, presenceBridge); ctx.subscriptions.push(presence);
 	follow = (userId: string) => { followingUserId = userId; presenceBridge.follow(userId); for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), followingUserId }); };

@@ -80,7 +80,7 @@ export function attachChat(webview: vscode.Webview, page: Page): vscode.Disposab
 	return vscode.Disposable.from(listener, new vscode.Disposable(() => { views.delete(webview); }));
 }
 
-export function startChat(ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
+export function startChat(_ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
 	const settings = vscode.workspace.getConfiguration('codeler');
 	const convexUrl = appConvexUrl();
 	projectId = settings.get<string>('projectId', '');

@@ -44,10 +44,9 @@ function killTree(child: Process): Promise<void> {
 	return Promise.resolve();
 }
 
-export function startShare(ctx: vscode.ExtensionContext, onChange?: (sharing: boolean) => void): vscode.Disposable {
+export function startShare(_ctx: vscode.ExtensionContext, onChange?: (sharing: boolean) => void): vscode.Disposable {
 	let state: ShareState = 'idle';
 	let child: Process | undefined;
-	let port: number | undefined;
 	let status: vscode.StatusBarItem | undefined;
 	let poll: ReturnType<typeof setInterval> | undefined;
 	let failedSince: number | undefined;
@@ -58,7 +57,7 @@ export function startShare(ctx: vscode.ExtensionContext, onChange?: (sharing: bo
 		if (poll) clearInterval(poll);
 		poll = undefined; failedSince = undefined;
 		if (child) await killTree(child);
-		child = undefined; port = undefined;
+		child = undefined;
 		status?.dispose(); status = undefined;
 		state = nextState(state, 'stopped');
 		onChange?.(false);
@@ -71,7 +70,7 @@ export function startShare(ctx: vscode.ExtensionContext, onChange?: (sharing: bo
 		const selected = found.port;
 		const choice = await vscode.window.showWarningMessage(`Share http://localhost:${selected}? It is ${found.service}. Anyone with the link can open it while sharing is on.`, { modal: true }, 'Share', 'Cancel');
 		if (choice !== 'Share') return;
-		state = nextState(state, 'start'); port = selected;
+		state = nextState(state, 'start');
 		const maxMinutes = shareMinutes(vscode.workspace.getConfiguration('codeler').get<unknown>('share.maxMinutes', 120));
 		const startedAt = Date.now();
 		try {

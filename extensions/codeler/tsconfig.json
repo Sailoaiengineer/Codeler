@@ -3,14 +3,14 @@
 	"compilerOptions": {
 		"rootDir": "./src",
 		"outDir": "./out",
-		"types": [],
-		"lib": [
-			"ES2024",
-			"DOM"
-		]
+		"types": ["node"],
+		"typeRoots": ["./node_modules/@types"],
+		"lib": ["ES2024", "DOM"]
 	},
 	"include": [
 		"src/**/*",
 		"../../src/vscode-dts/vscode.d.ts"
-	]
+	],
+	// Tests run under Node's test runner (`node --test`), not in the app build.
+	"exclude": ["src/**/*.test.ts"]
 }

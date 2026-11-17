@@ -13,7 +13,7 @@ type State = { file: string; doc: Y.Doc; text: Y.Text; disk: string; synced: str
 type ProjectArgs = { projectId: string }; type FileArgs = ProjectArgs & { path: string }; type PushArgs = FileArgs & { updates: Uint8Array[]; size: number }; type RenameArgs = FileArgs & { newPath: string };
 type SyncRpc = { query(name: 'sync:loadFile', args: FileArgs): Promise<any>; query(name: 'sync:listFiles', args: ProjectArgs): Promise<any>; mutation(name: 'sync:pushUpdates', args: PushArgs): Promise<number>; mutation(name: 'sync:saveSnapshot', args: FileArgs & { version: number; state: Uint8Array; size: number }): Promise<void>; mutation(name: 'sync:deleteFile', args: FileArgs): Promise<void>; mutation(name: 'sync:renameFile', args: RenameArgs): Promise<void>; onUpdate(name: 'sync:listFiles', args: ProjectArgs, callback: (value: FileRow[]) => void): () => void; onUpdate(name: 'sync:updates', args: FileArgs & { afterVersion: number }, callback: (value: any) => void): () => void };
 
-export function startSync(ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
+export function startSync(_ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
 	const convexUrl = appConvexUrl();

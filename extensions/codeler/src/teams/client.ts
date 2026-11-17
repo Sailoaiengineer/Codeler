@@ -1,5 +1,4 @@
 import { ConvexHttpClient } from 'convex/browser';
-import * as vscode from 'vscode';
 import { Auth, convexUrl } from '../auth';
 
 export type TeamProject = { id: string; name: string };

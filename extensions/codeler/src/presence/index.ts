@@ -19,7 +19,7 @@ const insideUri = (root: string, file: string) => {
 	return isSafeRelativePath(file) && abs.startsWith(root + path.sep) ? vscode.Uri.file(abs) : undefined;
 };
 
-export function startPresence(ctx: vscode.ExtensionContext, auth: Auth, bridge: PresenceBridge): vscode.Disposable {
+export function startPresence(_ctx: vscode.ExtensionContext, auth: Auth, bridge: PresenceBridge): vscode.Disposable {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
 	const convexUrl = appConvexUrl();

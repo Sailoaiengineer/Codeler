@@ -56,6 +56,7 @@ class AiView implements vscode.WebviewViewProvider, vscode.TextDocumentContentPr
 			case 'apply': return this.apply(Number(m.id));
 			case 'discard': return this.discard(Number(m.id));
 			case 'manageMcp': return vscode.commands.executeCommand('codeler.ai.manageMcp');
+			default: return;
 		}
 	}
 
