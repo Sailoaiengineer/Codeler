@@ -32,7 +32,7 @@ test('paths outside the workspace or with .. are rejected', () => {
 		assert.ok(checkRelativePath(p), `expected rejection for ${JSON.stringify(p)}`);
 	}
 	assert.equal(checkRelativePath('src/deep/file.ts'), undefined);
-	for (const p of ['.git/config', 'src/.git/HEAD', '.codeler/history/x', 'pkg/.CODELER/y']) {
+	for (const p of ['.git/config', 'src/.git/HEAD', '.codeler/history/x', 'pkg/.CODELER/y', '.vscode/tasks.json', '.github/workflows/a.yml', '.husky/pre-commit']) {
 		assert.ok(checkRelativePath(p), `expected rejection for ${p}`);
 	}
 	assert.equal(checkRelativePath('src/.gitignore'), undefined);

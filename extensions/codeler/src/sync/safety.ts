@@ -2,12 +2,18 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const MAX_FILE_SIZE = 2 * 1024 * 1024;
-const IGNORED = new Set(['node_modules', '.git', '.codeler', 'dist', 'out', '.next']);
+// Shared project path rule. The same rule lives in web/convex/projectPath.ts and extensions/codeler/mcp/server.js: keep all three identical.
+const BLOCKED = new Set(['node_modules', '.git', '.codeler', 'dist', 'out', '.next']);
+const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/;
 
 export function isSafeRelativePath(file: string): boolean {
-	if (!file || file.includes('\0') || file.startsWith('/') || file.startsWith('\\') || /^[A-Za-z]:/.test(file)) return false;
-	const parts = file.replaceAll('\\', '/').split('/');
-	return parts.every(Boolean) && !parts.includes('..') && !parts.some(p => IGNORED.has(p));
+	if (typeof file !== 'string' || file.length === 0 || file.length > 500 || /[\u0000-\u001f\u007f]/.test(file)) return false;
+	if (file.startsWith('/') || file.startsWith('\\') || /^[A-Za-z]:/.test(file)) return false;
+	return file.replaceAll('\\', '/').split('/').every(seg => {
+		if (!seg || seg === '.' || seg === '..' || /[. ]$/.test(seg) || seg.includes(':')) return false;
+		if (RESERVED.test(seg.split('.')[0].trim().toUpperCase())) return false;
+		return !BLOCKED.has(seg.toLowerCase());
+	});
 }
 
 export function isIgnored(file: string, size?: number): boolean {

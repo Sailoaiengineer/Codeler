@@ -2,18 +2,13 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { requireProjectMember } from "./access";
+import { isSafeRelativePath } from "./projectPath";
 
 const MAX_UPDATE = 256 * 1024;
 const MAX_FILE = 2 * 1024 * 1024;
 
-function validPath(path: string) {
-  if (!path || path.includes("\0") || path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:/.test(path)) return false;
-  const parts = path.replaceAll("\\", "/").split("/");
-  return parts.every((part) => part !== ".." && part !== "") && !parts.some((part) => ["node_modules", ".git", ".codeler", "dist", "out", ".next"].includes(part));
-}
-
 function checkPath(path: string) {
-  if (!validPath(path)) throw new ConvexError("Invalid project path.");
+  if (!isSafeRelativePath(path)) throw new ConvexError("Invalid project path.");
 }
 
 function checkUpdate(update: Uint8Array) {

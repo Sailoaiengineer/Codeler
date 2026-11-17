@@ -29,8 +29,8 @@ export function checkRelativePath(p: string): string | undefined {
 	if (!p || p.includes('\0')) return 'The path is empty or invalid.';
 	if (/^([A-Za-z]:|[\\/])/.test(p)) return 'The path must be relative to the workspace.';
 	if (p.split(/[\\/]/).includes('..')) return 'The path must not contain "..".';
-	// .git and .codeler hold history and repo data; an AI edit must never write there.
-	if (p.split(/[\\/]/).some(s => /^\.(git|codeler)$/i.test(s))) return 'Codeler will not edit .git or .codeler files.';
+	// .git and .codeler hold history and repo data; team config folders run tasks and hooks, so an AI edit never writes there either.
+	if (p.split(/[\\/]/).some(s => /^\.(git|codeler|vscode|github|husky)$/i.test(s))) return 'Codeler will not edit .git, .codeler or team config (.vscode, .github, .husky) files.';
 	return undefined;
 }
 

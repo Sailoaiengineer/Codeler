@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import * as fsp from 'node:fs/promises';
+import { isSafeRelativePath, safePath } from '../sync/safety';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -161,7 +163,7 @@ class AiView implements vscode.WebviewViewProvider, vscode.TextDocumentContentPr
 		const id = this.nextId++;
 		let error = e.error;
 		if (!error && !this.root) error = 'Open a folder first.';
-		if (!error && !this.inside(e.path)) error = 'The path is outside the workspace.';
+		if (!error && (!this.inside(e.path) || !isSafeRelativePath(e.path))) error = 'The path is outside the workspace.';
 		if (!error) this.pending.set(id, { path: e.path, content: e.content });
 		return { id, path: e.path, error, state: 'open' };
 	}
@@ -197,12 +199,16 @@ class AiView implements vscode.WebviewViewProvider, vscode.TextDocumentContentPr
 	private async apply(id: number) {
 		const p = this.pending.get(id);
 		if (!p || !this.root || !this.inside(p.path)) return;
+		// The real target (symlinks in the folders resolved) must stay inside the project, and the file itself must not be a symlink.
+		const real = safePath(this.root, p.path);
+		const isLink = await fsp.lstat(path.resolve(this.root, p.path)).then(s => s.isSymbolicLink(), () => false);
+		if (!real || isLink) return vscode.window.showWarningMessage(`Codeler will not write ${p.path}: it is a symlink or resolves outside the project.`).then(() => undefined);
 		const target = vscode.Uri.file(path.resolve(this.root, p.path));
 		if (vscode.workspace.textDocuments.some(d => d.isDirty && d.uri.toString() === target.toString())) {
 			return vscode.window.showWarningMessage(`Save or discard your changes to ${p.path} first.`).then(() => undefined);
 		}
-		await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(target.fsPath)));
-		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(p.content));
+		await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(real)));
+		await vscode.workspace.fs.writeFile(vscode.Uri.file(real), new TextEncoder().encode(p.content));
 		this.pending.delete(id);
 		this.setEditState(id, 'applied');
 	}

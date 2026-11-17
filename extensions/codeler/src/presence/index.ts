@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { ConvexClient } from 'convex/browser';
 import { Auth } from '../auth';
 import { colorFor, followSelection, Presence, recentRows, TAG_COLORS } from './logic';
+import { isSafeRelativePath } from '../sync/safety';
 
 export type PresenceRow = Presence;
 export type PresenceBridge = { onRows: (rows: PresenceRow[]) => void; follow: (userId: string) => void; stopFollowing: () => void };
@@ -10,9 +11,12 @@ type Rpc = { mutation(name: 'presence:heartbeat', args: any): Promise<void>; onU
 
 const safeRelative = (root: string, uri: vscode.Uri) => {
 	const value = path.relative(root, uri.fsPath).split(path.sep).join('/');
-	if (!value || value.startsWith('../') || value === '..' || value.startsWith('/') || value.includes('\0') || /^[A-Za-z]:/.test(value)) return undefined;
-	const parts = value.split('/');
-	return parts.some(p => ['node_modules', '.git', '.codeler', 'dist', 'out', '.next'].includes(p)) ? undefined : value;
+	return isSafeRelativePath(value) ? value : undefined;
+};
+// A teammate's path is only opened when it passes the shared rule and resolves inside the workspace root.
+const insideUri = (root: string, file: string) => {
+	const abs = path.resolve(root, file);
+	return isSafeRelativePath(file) && abs.startsWith(root + path.sep) ? vscode.Uri.file(abs) : undefined;
 };
 
 export function startPresence(ctx: vscode.ExtensionContext, auth: Auth, bridge: PresenceBridge): vscode.Disposable {
@@ -42,7 +46,7 @@ export function startPresence(ctx: vscode.ExtensionContext, auth: Auth, bridge: 
 		bridge.onRows(latest);
 		if (!followed) return;
 		const target = latest.find(row => row.userId === followed); if (!target) return;
-		const uri = vscode.Uri.joinPath(vscode.Uri.file(root), ...target.path.split('/'));
+		const uri = insideUri(root, target.path); if (!uri) return;
 		const line = Math.max(0, target.line); const character = Math.max(0, target.character);
 		void vscode.window.showTextDocument(uri, { selection: new vscode.Range(line, character, line, character), preview: false });
 	};

@@ -1,6 +1,7 @@
 // Codeler version history: snapshots stored in <root>/.codeler/history. No vscode imports, so tests can run it directly.
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 
 export const IGNORED = new Set(['node_modules', '.git', '.codeler', 'dist', 'out', '.next']);
@@ -21,7 +22,8 @@ export function isSafePath(rel: string): boolean {
 	return rel.split('/').every(part => part !== '' && part !== '.' && part !== '..');
 }
 
-export const isIgnored = (rel: string) => rel.split('/').some(part => IGNORED.has(part));
+// Case-folded: on Windows ".GIT" is the same folder as ".git", and a snapshot of it could never be restored.
+export const isIgnored = (rel: string) => rel.split('/').some(part => IGNORED.has(part.toLowerCase()));
 export const isTracked = (rel: string) => isSafePath(rel) && !isIgnored(rel);
 
 export const isBinary = (data: Uint8Array) => data.subarray(0, 8192).includes(0);
@@ -110,17 +112,37 @@ export function planRestore(snapshot: Files, current: Files): { write: [string, 
 	};
 }
 
+/** The nearest existing ancestor of `abs` (or `abs` itself) must resolve inside `realRoot`. */
+function resolvesInside(realRoot: string, abs: string): boolean {
+	let probe = abs;
+	for (;;) {
+		try {
+			const real = fsSync.realpathSync.native(probe);
+			return real === realRoot || real.startsWith(realRoot + path.sep);
+		} catch {
+			const up = path.dirname(probe);
+			if (up === probe) { return false; }
+			probe = up;
+		}
+	}
+}
+
 /** Saves "Before restoring <name>", then makes the tracked files match `snapshot`. Returns the safety snapshot. */
 export async function restoreSnapshot(root: string, snapshot: Snapshot, now = Date.now()): Promise<Snapshot> {
 	const before = await saveSnapshot(root, `Before restoring ${snapshot.message}`, now);
 	const plan = planRestore(snapshot.files, before.files);
-	const realRoot = await fs.realpath(root);
-	const inside = (p: string) => p === realRoot || p.startsWith(realRoot + path.sep);
+	const realRoot = fsSync.realpathSync.native(root);
+	const targets = [...plan.write.map(([rel]) => rel), ...plan.remove];
+	// Check every target before writing anything: no write or delete may go through a symlink or outside the project.
+	for (const rel of targets) {
+		const abs = path.join(root, ...rel.split('/'));
+		if (!resolvesInside(realRoot, abs)) { throw new Error(`Refusing to write outside the project: ${rel}`); }
+		const st = await fs.lstat(abs).catch(() => undefined);
+		if (st?.isSymbolicLink()) { throw new Error(`Refusing to replace a symlink: ${rel}`); }
+	}
 	for (const [rel, sha] of plan.write) {
 		const abs = path.join(root, ...rel.split('/'));
 		await fs.mkdir(path.dirname(abs), { recursive: true });
-		// Don't write through a symlinked folder that points outside the project.
-		if (!inside(await fs.realpath(path.dirname(abs)))) { throw new Error(`Refusing to write outside the project: ${rel}`); }
 		await fs.writeFile(abs, await readBlob(root, sha));
 	}
 	for (const rel of plan.remove) { await fs.rm(path.join(root, ...rel.split('/')), { force: true }); }
