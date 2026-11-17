@@ -1,4 +1,5 @@
-import { mutation } from "./_generated/server";
+import { mutation, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { requireMember, requireProjectMember } from "./access";
 
@@ -38,26 +39,31 @@ export const remove = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     await requireProjectMember(ctx, projectId, ["owner"]);
-    // shortcut: collects each table in one transaction, so a very large project may hit transaction limits, upgrade to batched deletes when that happens
-    const files = await ctx.db.query("syncFiles").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
-    for (const file of files) {
-      const snapshots = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
-      for (const row of snapshots) await ctx.db.delete(row._id);
-      const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
-      for (const row of updates) await ctx.db.delete(row._id);
-      await ctx.db.delete(file._id);
-    }
-    const presence = await ctx.db.query("presence").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
-    for (const row of presence) await ctx.db.delete(row._id);
-    const messages = await ctx.db.query("messages").withIndex("by_project_created", (q) => q.eq("projectId", projectId)).collect();
-    for (const row of messages) {
-      if (row.attachment) await ctx.storage.delete(row.attachment.storageId);
-      await ctx.db.delete(row._id);
-    }
-    const notifications = await ctx.db.query("notifications").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
-    for (const row of notifications) await ctx.db.delete(row._id);
-    const activity = await ctx.db.query("activity").withIndex("by_project_created", (q) => q.eq("projectId", projectId)).collect();
-    for (const row of activity) await ctx.db.delete(row._id);
-    await ctx.db.delete(projectId);
+    await purgeProject(ctx, projectId);
   },
 });
+
+/** Deletes a project and everything stored for it. Used by projects.remove and teams.deleteTeam. */
+export async function purgeProject(ctx: MutationCtx, projectId: Id<"projects">) {
+  // shortcut: collects each table in one transaction, so a very large project may hit transaction limits, upgrade to batched deletes when that happens
+  const files = await ctx.db.query("syncFiles").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
+  for (const file of files) {
+    const snapshots = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
+    for (const row of snapshots) await ctx.db.delete(row._id);
+    const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id)).collect();
+    for (const row of updates) await ctx.db.delete(row._id);
+    await ctx.db.delete(file._id);
+  }
+  const presence = await ctx.db.query("presence").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
+  for (const row of presence) await ctx.db.delete(row._id);
+  const messages = await ctx.db.query("messages").withIndex("by_project_created", (q) => q.eq("projectId", projectId)).collect();
+  for (const row of messages) {
+    if (row.attachment) await ctx.storage.delete(row.attachment.storageId);
+    await ctx.db.delete(row._id);
+  }
+  const notifications = await ctx.db.query("notifications").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect();
+  for (const row of notifications) await ctx.db.delete(row._id);
+  const activity = await ctx.db.query("activity").withIndex("by_project_created", (q) => q.eq("projectId", projectId)).collect();
+  for (const row of activity) await ctx.db.delete(row._id);
+  await ctx.db.delete(projectId);
+}

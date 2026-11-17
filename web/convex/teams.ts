@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, mutation, query, type MutationCtx } fr
 import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { requireMember, requireUser } from "./access";
+import { purgeProject } from "./projects";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clean = (s: string, max: number) => s.trim().replace(/\s+/g, " ").slice(0, max);
@@ -225,11 +226,14 @@ export const deleteTeam = mutation({
   args: { teamId: v.id("teams") },
   handler: async (ctx, { teamId }) => {
     await requireMember(ctx, teamId, ["owner"]);
-    // shortcut: also needs to delete live-sync/chat data once those tables exist; one transaction caps at a few thousand rows
+    // shortcut: one transaction caps at a few thousand rows; switch to batched deletes for very large teams
     const members = await ctx.db.query("members").withIndex("by_team_status", (q) => q.eq("teamId", teamId)).collect();
     const invites = await ctx.db.query("invites").withIndex("by_team", (q) => q.eq("teamId", teamId)).collect();
     const projects = await ctx.db.query("projects").withIndex("by_team", (q) => q.eq("teamId", teamId)).collect();
-    for (const r of [...members, ...invites, ...projects]) await ctx.db.delete(r._id);
+    for (const p of projects) await purgeProject(ctx, p._id);
+    for (const r of [...members, ...invites]) await ctx.db.delete(r._id);
+    const team = await ctx.db.get(teamId);
+    if (team?.imageId) await ctx.storage.delete(team.imageId);
     await ctx.db.delete(teamId);
   },
 });
