@@ -13,6 +13,9 @@ env:
   BINARY_NAME: codeler
   ORG_NAME: Codeler
   VSCODIUM_COMMIT: ca7f7b44b5e5c3faa663f6cdc043998f71936653
+  # Build downloads from GitHub (ripgrep, VS Code's extensions) hit the anonymous rate limit without it.
+  # Read-only: this workflow's permissions are contents: read.
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   windows:
