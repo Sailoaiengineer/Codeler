@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkDocument } from './tools';
+import { recordActivity } from '../activity';
 import { detectRunCommand, RunCommand, RunConfig, validateRunConfig } from './logic';
 
 const configName = '.codeler/run.json';
@@ -89,6 +90,7 @@ async function runCommand(command: RunCommand): Promise<void> {
 	if (running) { terminal.sendText('\u0003', false); await new Promise(resolve => setTimeout(resolve, 100)); }
 	terminal.sendText(command.command, true);
 	running = true;
+	void recordActivity('run', command.name);
 }
 
 async function inputCommand(existing?: RunCommand): Promise<RunCommand | undefined> {

@@ -13,6 +13,7 @@ import { startHistory } from './history';
 import { startPicks } from './picks';
 import { startAi } from './ai';
 import { startShare } from './share';
+import { bindActivity } from './activity';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
@@ -137,6 +138,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(startPicks(ctx));
 	ctx.subscriptions.push(startAi(ctx));
 	const auth = new Auth(ctx.secrets);
+	bindActivity(auth);
 	const teams = new TeamClient(auth);
 	ctx.subscriptions.push(startChat(ctx, auth));
 	currentUserId = auth.me?.id;
