@@ -10,3 +10,5 @@ dist/
 codex-*.log
 .claude/
 codex-parallel.log
+web/.agents/
+web/skills-lock.json

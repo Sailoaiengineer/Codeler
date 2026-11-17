@@ -6,6 +6,7 @@ import { components } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 import authSchema from "./betterAuth/schema";
+import { emailAllowed } from "./allowList";
 
 // The desktop app identifies itself with this id in the device sign-in flow; nothing else may start one.
 export const DESKTOP_CLIENT_ID = "codeler-desktop";
@@ -32,6 +33,10 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
       updateAge: 60 * 60 * 24,
     },
     user: { deleteUser: { enabled: true } },
+    // Only emails in ALLOWED_EMAILS (Convex env) can create an account; returning false blocks it.
+    databaseHooks: {
+      user: { create: { before: async (user) => emailAllowed(user.email, process.env.ALLOWED_EMAILS) ? undefined : false } },
+    },
     rateLimit: {
       enabled: true,
       storage: "database",
