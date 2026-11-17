@@ -4,6 +4,7 @@ import { sample } from './sample';
 import { Auth } from './auth';
 import { attachChat, onDidChangeUnread, startChat, unreadCount } from './chat';
 import { startSync } from './sync';
+import { isSafeRelativePath, safePath } from './sync/safety';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
 import { TeamClient } from './teams/client';
@@ -67,8 +68,10 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 	webview.onDidReceiveMessage(async (m: { type: string; file?: string; line?: number; text?: string; userId?: string; name?: string; description?: string; password?: string; invites?: { email: string; role: 'Admin' | 'Member' }[]; joinCode?: string; memberId?: string; projectId?: string; projectName?: string; teamId?: string; projectCount?: number; image?: { type: string; dataUrl: string } }) => {
 		if (m.type === 'openLine' && m.file) {
 			// shortcut: sample links resolve inside the first workspace folder only, until real project paths come from Convex
-			const root = vscode.workspace.workspaceFolders?.[0]?.uri;
-			if (root) vscode.window.showTextDocument(vscode.Uri.joinPath(root, m.file), { selection: new vscode.Range((m.line ?? 1) - 1, 0, (m.line ?? 1) - 1, 0) });
+			// The file name comes from chat text, so it must pass the shared rule and resolve inside the workspace.
+			const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+			const target = root && isSafeRelativePath(m.file) ? safePath(root, m.file) : undefined;
+			if (target) vscode.window.showTextDocument(vscode.Uri.file(target), { selection: new vscode.Range((m.line ?? 1) - 1, 0, (m.line ?? 1) - 1, 0) });
 		} else if (m.type === 'close') {
 			vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 		} else if (m.type === 'notReady') {

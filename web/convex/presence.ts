@@ -1,13 +1,9 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireProjectMember } from "./access";
+import { isSafeRelativePath } from "./projectPath";
 
-const validPath = (path: string) => {
-  if (!path || path.includes("\0") || path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:/.test(path)) return false;
-  const parts = path.replaceAll("\\", "/").split("/");
-  return parts.every((part) => part !== ".." && part !== "") && !parts.some((part) => ["node_modules", ".git", ".codeler", "dist", "out", ".next"].includes(part));
-};
-const checkPath = (path: string) => { if (!validPath(path)) throw new ConvexError("Invalid project path."); };
+const checkPath = (path: string) => { if (!isSafeRelativePath(path)) throw new ConvexError("Invalid project path."); };
 
 const point = v.object({ line: v.number(), character: v.number() });
 const selection = v.object({ startLine: v.number(), startCharacter: v.number(), endLine: v.number(), endCharacter: v.number() });

@@ -1,6 +1,7 @@
 // Codeler version history: the "Changes" view, snapshot commands and the editor gutter. Logic lives in ./logic.
 import * as vscode from 'vscode';
 import { recordActivity } from '../activity';
+import { isSafeRelativePath } from '../sync/safety';
 import { Change, currentFiles, diff, listSnapshots, readBlob, relativeTime, restoreSnapshot, saveSnapshot, Snapshot } from './logic';
 
 const SCHEME = 'codeler-history';
@@ -93,6 +94,9 @@ export function startHistory(_ctx: vscode.ExtensionContext): vscode.Disposable {
 	const restore = async (snapshot?: Snapshot) => {
 		snapshot ??= await pickSnapshot('Pick a snapshot to restore');
 		if (!snapshot) { return; }
+		// Manifests can come from a cloned repo, so every path gets the shared project rule before anything is written.
+		const bad = Object.keys(snapshot.files).find(p => !isSafeRelativePath(p));
+		if (bad) { vscode.window.showErrorMessage(`Couldn't restore '${snapshot.message}': the snapshot contains a path that isn't allowed: ${bad}`); return; }
 		const ok = await vscode.window.showWarningMessage(`Restore '${snapshot.message}'? Your current files will be replaced.`,
 			{ modal: true, detail: 'A snapshot of your current work is saved first so you can undo this.' }, 'Restore');
 		if (ok !== 'Restore') { return; }
