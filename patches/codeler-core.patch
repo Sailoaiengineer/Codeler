@@ -1,8 +1,8 @@
 diff --git a/build/gulpfile.extensions.ts b/build/gulpfile.extensions.ts
-index bc1f9fba71c..58e27ff1e59 100644
+index 2b8f7a0f797..35962bb01cc 100644
 --- a/build/gulpfile.extensions.ts
 +++ b/build/gulpfile.extensions.ts
-@@ -84,6 +84,7 @@ const compilations = [
+@@ -85,6 +85,7 @@ const compilations = [
  	'extensions/references-view/tsconfig.json',
  	'extensions/search-result/tsconfig.json',
  	'extensions/simple-browser/tsconfig.json',
@@ -24,13 +24,13 @@ index 7e31cd31c3a..dec075ac25d 100644
  /** Centers macOS traffic lights vertically, optionally keeping their horizontal inset independent of height. */
  export function getMacOSWindowControlsPosition(height: number, osVersion: string, horizontalInset?: number): IPoint | null {
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-index e8edbe1bfdd..e0aa6df682e 100644
+index f6512c72def..15c9db6f1f2 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 +++ b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-@@ -41,6 +41,17 @@ import { IWorkbenchEnvironmentService } from '../../../services/environment/comm
- import { IViewsService } from '../../../services/views/common/viewsService.js';
+@@ -42,6 +42,17 @@ import { IViewsService } from '../../../services/views/common/viewsService.js';
  import { SwitchCompositeViewAction } from '../compositeBarActions.js';
  import { IHostService } from '../../../services/host/browser/host.js';
+ import { FONT, getFontSize, updateActivityBarSize } from '../../../../base/common/font.js';
 +import { Emitter } from '../../../../base/common/event.js';
 +import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 +import './media/codeler.css';
@@ -45,7 +45,7 @@ index e8edbe1bfdd..e0aa6df682e 100644
  
  export class ActivitybarPart extends Part {
  
-@@ -105,6 +116,9 @@ export class ActivitybarPart extends Part {
+@@ -108,6 +119,9 @@ export class ActivitybarPart extends Part {
  
  	/** The intrinsic activity bar width (excludes any floating gutter). */
  	private get baseWidth(): number {
@@ -54,9 +54,9 @@ index e8edbe1bfdd..e0aa6df682e 100644
 +		}
  		if (this.layoutService.isFloatingPanelsEnabled()) {
  			if (this._isCompact) {
- 				return ActivitybarPart.FLOATING_COMPACT_ACTIVITYBAR_WIDTH;
-@@ -114,6 +128,18 @@ export class ActivitybarPart extends Part {
- 		return this._isCompact ? ActivitybarPart.COMPACT_ACTIVITYBAR_WIDTH : ActivitybarPart.ACTIVITYBAR_WIDTH;
+ 				return FONT.activityBarSize36 * ActivitybarPart.FLOATING_COMPACT_ACTIVITYBAR_WIDTH_RATIO;
+@@ -117,6 +131,18 @@ export class ActivitybarPart extends Part {
+ 		return this._isCompact ? FONT.activityBarSize36 : FONT.activityBarSize48;
  	}
  
 +	// Codeler: labelled, wide activity bar (reference image 3), switched by `_codeler.activitybar.setExpanded`
@@ -74,7 +74,7 @@ index e8edbe1bfdd..e0aa6df682e 100644
  	/** The action (item) height that drives visible item sizing. */
  	private get actionHeight(): number {
  		if (this._isCompact) {
-@@ -191,6 +217,7 @@ export class ActivitybarPart extends Part {
+@@ -194,6 +220,7 @@ export class ActivitybarPart extends Part {
  		super(Parts.ACTIVITYBAR_PART, { hasTitle: false }, themeService, storageService, layoutService);
  
  		this._isCompact = this.configurationService.getValue<boolean>(LayoutSettings.ACTIVITY_BAR_COMPACT) ?? false;
@@ -82,7 +82,7 @@ index e8edbe1bfdd..e0aa6df682e 100644
  
  		this._register(this.configurationService.onDidChangeConfiguration(e => {
  			if (e.affectsConfiguration(LayoutSettings.ACTIVITY_BAR_COMPACT)) {
-@@ -235,6 +262,7 @@ export class ActivitybarPart extends Part {
+@@ -247,6 +274,7 @@ export class ActivitybarPart extends Part {
  	private updateCompactStyle(): void {
  		if (this.element) {
  			this.element.classList.toggle('compact', this._isCompact);
