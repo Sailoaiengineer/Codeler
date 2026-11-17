@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { requireMember, requireUser } from "./access";
 import { purgeProject } from "./projects";
+import { joinAllowed, LIMITS } from "./limits";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clean = (s: string, max: number) => s.trim().replace(/\s+/g, " ").slice(0, max);
@@ -67,16 +68,21 @@ export const secretByCode = internalQuery({
   },
 });
 
-export const recentAttempts = internalQuery({
-  args: { userId: v.string(), since: v.number() },
-  handler: async (ctx, { userId, since }) =>
-    (await ctx.db.query("joinAttempts").withIndex("by_user_at", (q) => q.eq("userId", userId).gte("at", since)).take(50)).length,
-});
-
-export const recordAttempt = internalMutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    await ctx.db.insert("joinAttempts", { userId, at: Date.now() });
+// Counts this person's and this team code's recent tries, and records this one, in one transaction.
+// Every try counts, right or wrong, so the check can run before the expensive hash.
+export const takeJoinAttempt = internalMutation({
+  args: { userId: v.string(), code: v.string() },
+  handler: async (ctx, { userId, code }) => {
+    const now = Date.now();
+    const userTries = await ctx.db.query("joinAttempts")
+      .withIndex("by_user_at", (q) => q.eq("userId", userId).gte("at", now - LIMITS.joinUserWindowMs))
+      .take(LIMITS.joinUserTries);
+    const teamTries = await ctx.db.query("joinAttempts")
+      .withIndex("by_code_at", (q) => q.eq("code", code).gte("at", now - LIMITS.joinTeamWindowMs))
+      .take(LIMITS.joinTeamTries);
+    if (!joinAllowed(userTries.length, teamTries.length)) return false;
+    await ctx.db.insert("joinAttempts", { userId, code, at: now });
+    return true;
   },
 });
 

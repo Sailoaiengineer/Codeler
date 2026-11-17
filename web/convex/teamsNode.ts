@@ -5,11 +5,10 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { ConvexError, v } from "convex/values";
 import { getUser } from "./auth";
+import { LIMITS } from "./limits";
 
 const SCRYPT = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const KEY_LEN = 32;
-const MAX_ATTEMPTS = 10; // wrong passwords per person per 15 minutes
-const WINDOW_MS = 15 * 60 * 1000;
 
 function hash(password: string, saltHex: string): Promise<Buffer> {
   return new Promise((resolve, reject) =>
@@ -18,7 +17,7 @@ function hash(password: string, saltHex: string): Promise<Buffer> {
 }
 
 function checkPassword(password: string) {
-  if (password.length < 8) throw new ConvexError("The team password needs at least 8 characters.");
+  if (password.length < LIMITS.minTeamPassword) throw new ConvexError(`The team password needs at least ${LIMITS.minTeamPassword} characters.`);
   if (password.length > 128) throw new ConvexError("The team password can be at most 128 characters.");
 }
 
@@ -64,16 +63,16 @@ export const requestJoin = action({
   handler: async (ctx, { joinCode: rawCode, password }): Promise<{ status: "pending" | "active" }> => {
     const user = await getUser(ctx);
     if (!user) throw new ConvexError("Sign in to Codeler first.");
-    const recent = await ctx.runQuery(internal.teams.recentAttempts, { userId: user._id, since: Date.now() - WINDOW_MS });
-    if (recent >= MAX_ATTEMPTS) throw new ConvexError("Too many wrong tries. Wait 15 minutes and try again.");
-
     const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(.{4})(.{4})$/, "$1-$2");
+    // Checked and recorded before scrypt, so guessing can't burn CPU past the limit.
+    const allowed = await ctx.runMutation(internal.teams.takeJoinAttempt, { userId: user._id, code });
+    if (!allowed) throw new ConvexError("Too many tries. Wait a while and try again.");
+
     const secret = await ctx.runQuery(internal.teams.secretByCode, { joinCode: code });
     // Hash even when the code is unknown, so timing doesn't reveal which codes exist.
     const actual = await hash(password.slice(0, 128), secret?.passwordSalt ?? "00".repeat(16));
     const expected = Buffer.from(secret?.passwordHash ?? "00".repeat(KEY_LEN), "hex");
     if (!secret || expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-      await ctx.runMutation(internal.teams.recordAttempt, { userId: user._id });
       throw new ConvexError("Wrong team code or password.");
     }
     return await ctx.runMutation(internal.teams.addPending, {

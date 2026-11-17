@@ -29,7 +29,7 @@
 		<div class="field">
 			<label for="pass">Team password</label>
 			<p class="hint">Teammates need this to ask to join. You still approve each one.</p>
-			<input class="input" id="pass" type="password" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
+			<input class="input" id="pass" type="password" placeholder="At least 10 characters" minlength="10" autocomplete="new-password" required>
 		</div>
 		<div class="field">
 			<span class="label">Team avatar / icon <small>(optional)</small></span>
@@ -131,7 +131,7 @@ $('form').addEventListener('submit', e => {
 	if (!signedIn) return vscode.postMessage({ type: 'signIn' });
 	err.textContent = '';
 	if (!$('name').value.trim()) return $('name').focus(), err.textContent = 'Give your team a name.';
-	if ($('pass').value.length < 8) return $('pass').focus(), err.textContent = 'The team password needs at least 8 characters.';
+	if ($('pass').value.length < 10) return $('pass').focus(), err.textContent = 'The team password needs at least 10 characters.';
 	vscode.postMessage({ type: 'createTeam', name: $('name').value, description: $('desc').value, password: $('pass').value, invites, image: avatar });
 });
 $('join-form').addEventListener('submit', e => {

@@ -1,6 +1,10 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireProjectMember } from "./access";
+import { takeRateToken } from "./rateLimit";
+import { capMentions, LIMITS, MINUTE_MS } from "./limits";
+
+const HOUR_MS = 60 * MINUTE_MS;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const FILE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "text/plain", "application/pdf", "application/zip"]);
@@ -54,7 +58,7 @@ export const send = mutation({
     const active = await ctx.db.query("members")
       .withIndex("by_team_status", (q) => q.eq("teamId", project.teamId).eq("status", "active")).take(500);
     const named = new Set(mentionedNames(body, active.map((m) => m.name)));
-    const mentions = [...new Set(active.filter((m) => named.has(m.name) && m.userId !== user._id).map((m) => m.userId))];
+    const mentions = capMentions([...new Set(active.filter((m) => named.has(m.name) && m.userId !== user._id).map((m) => m.userId))]);
 
     const now = Date.now();
     const messageId = await ctx.db.insert("messages", {
@@ -86,7 +90,8 @@ export const list = query({
 export const generateUploadUrl = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
-    await requireProjectMember(ctx, projectId);
+    const { user } = await requireProjectMember(ctx, projectId);
+    await takeRateToken(ctx, `upload:${user._id}`, LIMITS.uploadUrlPerMinute, MINUTE_MS, "Too many uploads. Wait a minute and try again.");
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -101,19 +106,45 @@ export const attach = mutation({
     if (message.userId !== user._id) throw new ConvexError("You can only attach files to your own messages.");
     if (message.attachment) throw new ConvexError("This message already has a file.");
     // Uploads are not tied to a user, so any signed-in member could otherwise attach someone else's stored file.
-    // A file must be fresh and not already attached to another message.
+    // A file must be fresh and not already attached to another message. Taken files belong to that message, so they are kept.
     const taken = await ctx.db.query("messages").withIndex("by_attachment", (q) => q.eq("attachment.storageId", storageId)).first();
     if (taken) throw new ConvexError("That file is already attached to a message.");
+    // Once the upload itself is rejected nothing uses it again, so delete it before failing.
+    // shortcut: if Convex discards storage deletes when a mutation throws, the hourly sweepUploads cron removes it instead
+    const reject = async (msg: string) => {
+      await ctx.storage.delete(storageId).catch(() => undefined);
+      return new ConvexError(msg);
+    };
     const stored = await ctx.db.system.get(storageId);
-    if (!stored || Date.now() - stored._creationTime > 10 * 60 * 1000) throw new ConvexError("The upload expired. Attach the file again.");
+    if (!stored || Date.now() - stored._creationTime > 10 * 60 * 1000) throw await reject("The upload expired. Attach the file again.");
     const meta = await ctx.storage.getMetadata(storageId);
-    if (!meta) throw new ConvexError("The upload didn't finish. Try again.");
+    if (!meta) throw await reject("The upload didn't finish. Try again.");
     const type = (meta.contentType ?? "").split(";")[0].trim().toLowerCase();
-    if (!FILE_TYPES.has(type)) throw new ConvexError("That file type isn't allowed.");
-    if (meta.size > MAX_BYTES) throw new ConvexError("Files can be up to 10 MB.");
+    if (!FILE_TYPES.has(type)) throw await reject("That file type isn't allowed.");
+    if (meta.size > MAX_BYTES) throw await reject("Files can be up to 10 MB.");
     const cleanName = name.replace(/[\\/\0]/g, "_").trim().slice(0, 200);
-    if (!cleanName) throw new ConvexError("The file needs a name.");
+    if (!cleanName) throw await reject("The file needs a name.");
     await ctx.db.patch(messageId, { attachment: { storageId, name: cleanName, type, size: meta.size } });
+  },
+});
+
+// Hourly. Deletes stored files older than an hour that no message or team avatar uses.
+// Only files created in the last two hours are looked at, so referenced files that pile up can't crowd out new orphans.
+// shortcut: more than 500 unattached uploads in one two-hour window would leave the excess behind, raise the batch or paginate if that happens
+export const sweepUploads = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const now = Date.now();
+    const files = await ctx.db.system.query("_storage")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", now - 2 * HOUR_MS).lt("_creationTime", now - LIMITS.uploadSweepAgeMs))
+      .take(LIMITS.batch);
+    for (const file of files) {
+      const onMessage = await ctx.db.query("messages").withIndex("by_attachment", (q) => q.eq("attachment.storageId", file._id)).first();
+      if (onMessage) continue;
+      const onTeam = await ctx.db.query("teams").withIndex("by_image", (q) => q.eq("imageId", file._id)).first();
+      if (onTeam) continue;
+      await ctx.storage.delete(file._id);
+    }
   },
 });
 
