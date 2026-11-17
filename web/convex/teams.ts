@@ -1,9 +1,27 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { requireMember, requireUser } from "./access";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const clean = (s: string, max: number) => s.trim().replace(/\s+/g, " ").slice(0, max);
+const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const AVATAR_MAX_BYTES = 1024 * 1024;
+const AVATAR_WINDOW_MS = 10 * 60 * 1000;
+
+// Team-level activity is stored per project, so write one row per project (a team has at most 100).
+async function recordTeamActivity(
+  ctx: MutationCtx, teamId: Id<"teams">,
+  rows: { userId: string; name: string; kind: "approved" | "joined" | "left" | "removed"; detail: string }[],
+) {
+  const projects = await ctx.db.query("projects").withIndex("by_team", (q) => q.eq("teamId", teamId)).take(100);
+  const now = Date.now();
+  for (const p of projects) {
+    for (const r of rows) {
+      await ctx.db.insert("activity", { projectId: p._id, userId: r.userId, name: r.name, kind: r.kind, detail: r.detail.slice(0, 300), createdAt: now });
+    }
+  }
+}
 
 // ---- Internal: called only by the actions in teamsNode.ts (which hash passwords) ----
 
@@ -98,15 +116,16 @@ export const mine = query({
     for (const m of rows) {
       const team = await ctx.db.get(m.teamId);
       if (!team) continue;
+      const imageUrl = team.imageId ? await ctx.storage.getUrl(team.imageId) : null;
       if (m.status === "pending") {
-        out.push({ teamId: team._id, name: team.name, role: m.role, status: m.status });
+        out.push({ teamId: team._id, name: team.name, role: m.role, status: m.status, imageUrl });
         continue;
       }
       const projects = await ctx.db.query("projects").withIndex("by_team", (q) => q.eq("teamId", team._id)).take(100);
       const waiting = m.role === "member" ? 0 : (await ctx.db.query("members")
         .withIndex("by_team_status", (q) => q.eq("teamId", team._id).eq("status", "pending")).take(100)).length;
       out.push({
-        teamId: team._id, name: team.name, role: m.role, status: m.status, waiting,
+        teamId: team._id, name: team.name, role: m.role, status: m.status, waiting, imageUrl,
         projects: projects.map((p) => ({ id: p._id, name: p.name })),
         // Only Owner/Admin see the code they share with new people.
         joinCode: m.role === "member" ? undefined : team.joinCode,
@@ -135,10 +154,14 @@ export const approve = mutation({
   handler: async (ctx, { memberId }) => {
     const row = await ctx.db.get(memberId);
     if (!row || row.status !== "pending") throw new ConvexError("That request is no longer waiting.");
-    const { member } = await requireMember(ctx, row.teamId, ["owner", "admin"]);
+    const { user, member } = await requireMember(ctx, row.teamId, ["owner", "admin"]);
     // Admins can't create admins: an invite for "admin" only applies when the Owner approves.
     const role = row.role === "admin" && member.role !== "owner" ? "member" : row.role;
     await ctx.db.patch(memberId, { status: "active", role });
+    await recordTeamActivity(ctx, row.teamId, [
+      { userId: user._id, name: member.name, kind: "approved", detail: `Approved ${row.name}` },
+      { userId: row.userId, name: row.name, kind: "joined", detail: `${row.name} joined the team` },
+    ]);
   },
 });
 
@@ -164,6 +187,11 @@ export const remove = mutation({
     const allowed = self || member.role === "owner" || (member.role === "admin" && row.role === "member");
     if (!allowed) throw new ConvexError("You don't have permission to do that.");
     await ctx.db.delete(memberId);
+    if (row.status === "active") {
+      await recordTeamActivity(ctx, row.teamId, self
+        ? [{ userId: user._id, name: row.name, kind: "left", detail: `${row.name} left the team` }]
+        : [{ userId: user._id, name: member.name, kind: "removed", detail: `Removed ${row.name} from the team` }]);
+    }
   },
 });
 
@@ -203,5 +231,31 @@ export const deleteTeam = mutation({
     const projects = await ctx.db.query("projects").withIndex("by_team", (q) => q.eq("teamId", teamId)).collect();
     for (const r of [...members, ...invites, ...projects]) await ctx.db.delete(r._id);
     await ctx.db.delete(teamId);
+  },
+});
+
+/** Owner only: where the browser uploads the avatar file. */
+export const generateAvatarUploadUrl = mutation({
+  args: { teamId: v.id("teams") },
+  handler: async (ctx, { teamId }) => {
+    await requireMember(ctx, teamId, ["owner"]);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/** Owner only. Checks the stored file itself (type, size, age), not what the client claims. */
+export const setAvatar = mutation({
+  args: { teamId: v.id("teams"), storageId: v.id("_storage") },
+  handler: async (ctx, { teamId, storageId }) => {
+    await requireMember(ctx, teamId, ["owner"]);
+    const file = await ctx.db.system.get(storageId);
+    if (!file || !AVATAR_TYPES.includes(file.contentType ?? "") || file.size > AVATAR_MAX_BYTES) {
+      throw new ConvexError("Use a PNG, JPEG or WebP image under 1 MB.");
+    }
+    if (file._creationTime < Date.now() - AVATAR_WINDOW_MS) throw new ConvexError("That upload expired. Try again.");
+    const team = await ctx.db.get(teamId);
+    if (!team) throw new ConvexError("You're not a member of this team.");
+    if (team.imageId && team.imageId !== storageId) await ctx.storage.delete(team.imageId);
+    await ctx.db.patch(teamId, { imageId: storageId });
   },
 });

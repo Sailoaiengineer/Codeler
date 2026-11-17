@@ -192,6 +192,11 @@
         "category": "Codeler"
       },
       {
+        "command": "codeler.shareFolderWithTeam",
+        "title": "Share this folder with a team",
+        "category": "Codeler"
+      },
+      {
         "command": "codeler.pickBranch",
         "title": "Version history",
         "category": "Codeler"

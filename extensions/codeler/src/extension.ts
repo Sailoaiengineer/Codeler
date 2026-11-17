@@ -7,7 +7,7 @@ import { startSync } from './sync';
 import { startPresence, presenceDecorationProvider, PresenceRow } from './presence';
 import { colorFor, cursorRows } from './presence/logic';
 import { TeamClient } from './teams/client';
-import { cleanCreate, cleanJoin } from './teams/logic';
+import { checkAvatar, cleanCreate, cleanJoin, cleanProjectName, projectLimitReached } from './teams/logic';
 import { startRun } from './run';
 import { startHistory } from './history';
 import { startPicks } from './picks';
@@ -40,9 +40,12 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 	webview.options = { enableScripts: true, localResourceRoots: [media] };
 	const nonce = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 	const read = (f: string) => vscode.workspace.fs.readFile(vscode.Uri.joinPath(media, f)).then(b => Buffer.from(b).toString("utf8"));
+	// Team avatars are served from the Convex deployment, so its origin is allowed for images.
+	let convexOrigin = '';
+	try { convexOrigin = new URL(vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '')).origin; } catch { /* not configured yet */ }
 	read(page + '.html').then(html => {
 		webview.html = html
-			.replaceAll('{{csp}}', `default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';`)
+			.replaceAll('{{csp}}', `default-src 'none'; img-src ${webview.cspSource} data: ${convexOrigin}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';`)
 			.replaceAll('{{nonce}}', nonce)
 			.replaceAll('{{css}}', webview.asWebviewUri(vscode.Uri.joinPath(media, 'codeler.css')).toString())
 			.replaceAll('{{js}}', webview.asWebviewUri(vscode.Uri.joinPath(media, 'codeler.js')).toString())
@@ -51,16 +54,17 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 	const refresh = async () => {
 		if (!teams || !auth) return;
 		const signedIn = Boolean(auth.me);
-		if (!signedIn) { void webview.postMessage({ type: 'teamData', signedIn: false }); return; }
+		const folderOpen = Boolean(vscode.workspace.workspaceFolders?.length);
+		if (!signedIn) { void webview.postMessage({ type: 'teamData', signedIn: false, folderOpen }); return; }
 		try {
 			const mine = await teams.mine();
 			const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
 			const current = mine.find(t => t.projects?.some(p => p.id === projectId));
 			const members = current ? await teams.people(current.teamId) : undefined;
-			void webview.postMessage({ type: 'teamData', signedIn: true, teams: mine, members });
+			void webview.postMessage({ type: 'teamData', signedIn: true, folderOpen, teams: mine, members });
 		} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
 	};
-	webview.onDidReceiveMessage(async (m: { type: string; file?: string; line?: number; text?: string; userId?: string; name?: string; description?: string; password?: string; invites?: { email: string; role: 'Admin' | 'Member' }[]; joinCode?: string; memberId?: string; projectId?: string; projectName?: string }) => {
+	webview.onDidReceiveMessage(async (m: { type: string; file?: string; line?: number; text?: string; userId?: string; name?: string; description?: string; password?: string; invites?: { email: string; role: 'Admin' | 'Member' }[]; joinCode?: string; memberId?: string; projectId?: string; projectName?: string; teamId?: string; projectCount?: number; image?: { type: string; dataUrl: string } }) => {
 		if (m.type === 'openLine' && m.file) {
 			// shortcut: sample links resolve inside the first workspace folder only, until real project paths come from Convex
 			const root = vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -76,9 +80,28 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 		} else if (m.type === 'createTeam' && teams && auth) {
 			try {
 				if (!auth.me) return void vscode.commands.executeCommand('codeler.signIn');
+				const image = m.image ? { type: m.image.type, bytes: Uint8Array.from(atob(m.image.dataUrl.split(',')[1] ?? ''), c => c.charCodeAt(0)) } : undefined;
+				const imageError = image && checkAvatar(image.type, image.bytes.length);
+				if (imageError) return void webview.postMessage({ type: 'teamError', error: imageError });
 				const result = await teams.create(cleanCreate(m.name ?? '', m.description ?? '', m.password ?? '', (m.invites ?? []).map(i => ({ email: i.email, role: i.role.toLowerCase() as 'admin' | 'member' }))));
 				void webview.postMessage({ type: 'teamCreated', joinCode: result.joinCode });
+				if (image) {
+					// The team exists by now, so a failed upload is reported without undoing the team.
+					try { await teams.uploadAvatar(result.teamId, image.bytes, image.type); }
+					catch (error) { void webview.postMessage({ type: 'teamError', error: `Team created, but the image didn't upload. ${TeamClient.error(error)}` }); }
+				}
 			} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'newProject' && teams && m.teamId) {
+			try {
+				if (projectLimitReached(m.projectCount ?? 0)) throw new Error('A team can have up to 100 projects.');
+				const input = await vscode.window.showInputBox({ prompt: 'Project name', placeHolder: 'e.g. Website', validateInput: v => cleanProjectName(v).error });
+				const name = input === undefined ? undefined : cleanProjectName(input).name;
+				if (!name) return;
+				await teams.createProject(m.teamId, name);
+				await refresh();
+			} catch (error) { void webview.postMessage({ type: 'teamError', error: TeamClient.error(error) }); }
+		} else if (m.type === 'shareFolder') {
+			void vscode.commands.executeCommand('codeler.shareFolderWithTeam');
 		} else if (m.type === 'joinTeam' && teams && auth) {
 			try {
 				if (!auth.me) return void vscode.commands.executeCommand('codeler.signIn');
@@ -245,6 +268,30 @@ export function activate(ctx: vscode.ExtensionContext) {
 			const pick = await vscode.window.showQuickPick([...picks, { label: '$(folder-opened) Open a folder on this PC…', description: '', id: '' }], { placeHolder: 'Switch project' });
 			if (pick?.label.startsWith('$(folder-opened)')) return void vscode.commands.executeCommand('workbench.action.files.openFolder');
 			if (pick?.id) { await vscode.workspace.getConfiguration('codeler').update('projectId', pick.id, vscode.ConfigurationTarget.Global); await vscode.workspace.getConfiguration('codeler').update('projectName', pick.label, vscode.ConfigurationTarget.Global); await vscode.commands.executeCommand('workbench.action.reloadWindow'); }
+		}),
+		vscode.commands.registerCommand('codeler.shareFolderWithTeam', async () => {
+			const folder = vscode.workspace.workspaceFolders?.[0];
+			if (!folder) return void vscode.window.showErrorMessage('Open a folder first.');
+			if (!auth.me) return void vscode.commands.executeCommand('codeler.signIn');
+			try {
+				const mine = await teams.mine();
+				const owned = mine.filter(t => t.status === 'active' && (t.role === 'owner' || t.role === 'admin'));
+				if (!owned.length) return void vscode.window.showInformationMessage('You need to be an owner or admin of a team to share a folder.');
+				const pick = await vscode.window.showQuickPick(owned.map(t => ({ label: t.name, description: t.role, team: t })), { placeHolder: 'Share this folder with which team?' });
+				const team = pick?.team;
+				if (!team) return;
+				if (projectLimitReached(team.projects?.length ?? 0)) return void vscode.window.showErrorMessage('This team already has 100 projects.');
+				const input = await vscode.window.showInputBox({ prompt: 'Project name', value: folder.name, validateInput: v => cleanProjectName(v).error });
+				const name = input === undefined ? undefined : cleanProjectName(input).name;
+				if (!name) return;
+				const projectId = await teams.createProject(team.teamId, name);
+				// Workspace scope: this folder joins the project; other folders keep their own setting.
+				await vscode.workspace.getConfiguration('codeler').update('projectId', projectId, vscode.ConfigurationTarget.Workspace);
+				await vscode.workspace.getConfiguration('codeler').update('projectName', name, vscode.ConfigurationTarget.Workspace);
+				void vscode.window.showInformationMessage(`Uploading this folder to ${team.name}…`);
+				// Reload the window so live sync and presence start on the new project, as the Workspaces picker does.
+				await vscode.commands.executeCommand('workbench.action.reloadWindow');
+			} catch (error) { void vscode.window.showErrorMessage(TeamClient.error(error)); }
 		}),
 		vscode.commands.registerCommand('codeler.joinTeam', async (args?: { joinCode?: string; password?: string }) => args?.joinCode && args.password ? teams.join(cleanJoin(args.joinCode, args.password).joinCode, args.password) : undefined),
 		vscode.commands.registerCommand('codeler.pickBranch', () => vscode.window.showInformationMessage('Version history comes with the Changes view.')),

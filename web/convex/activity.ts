@@ -8,7 +8,7 @@ export const record = mutation({
     kind: v.union(
       v.literal("joined"), v.literal("left"), v.literal("approved"),
       v.literal("file_created"), v.literal("file_changed"), v.literal("file_deleted"), v.literal("file_renamed"),
-      v.literal("run"), v.literal("snapshot"),
+      v.literal("run"), v.literal("snapshot"), v.literal("removed"),
     ),
     detail: v.string(),
   },
