@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ConvexClient } from 'convex/browser';
 import { ConvexError } from 'convex/values';
-import { Auth } from '../auth';
+import { Auth, convexUrl as appConvexUrl } from '../auth';
 import { ActivityRow, ChatRow, admitSend, fileError, messageError, panelActivity, panelMessage } from './logic';
 
 // Live chat and activity. Signed out, or with no project set, nothing is pushed and the panels keep their sample data.
@@ -82,7 +82,7 @@ export function attachChat(webview: vscode.Webview, page: Page): vscode.Disposab
 
 export function startChat(ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
 	const settings = vscode.workspace.getConfiguration('codeler');
-	const convexUrl = settings.get<string>('convexUrl', '');
+	const convexUrl = appConvexUrl();
 	projectId = settings.get<string>('projectId', '');
 	if (!projectId || !convexUrl) return new vscode.Disposable(() => undefined);
 	const client = new ConvexClient(convexUrl);

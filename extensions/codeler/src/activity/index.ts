@@ -1,7 +1,7 @@
 // Records team activity from this desktop app. Best effort: nothing here may throw into the feature that called it.
 import * as vscode from 'vscode';
 import { ConvexHttpClient } from 'convex/browser';
-import { Auth } from '../auth';
+import { Auth, convexUrl } from '../auth';
 import { ActivityKind, activityDetail, admitChange } from './logic';
 
 let auth: Auth | undefined;
@@ -17,7 +17,7 @@ export async function recordActivity(kind: ActivityKind, detail: string): Promis
 	try {
 		const settings = vscode.workspace.getConfiguration('codeler');
 		const projectId = settings.get<string>('projectId', '');
-		const url = settings.get<string>('convexUrl', '').replace(/\/+$/, '');
+		const url = convexUrl();
 		const text = activityDetail(detail);
 		if (!auth?.me || !projectId || !url || !text) return;
 		const token = await auth.convexToken();

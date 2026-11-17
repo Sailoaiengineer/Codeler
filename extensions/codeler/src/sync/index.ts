@@ -3,7 +3,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { ConvexClient } from 'convex/browser';
 import * as Y from 'yjs';
-import { Auth } from '../auth';
+import { Auth, convexUrl as appConvexUrl } from '../auth';
 import { recordActivity, recordChange } from '../activity';
 import { isIgnored, looksBinary, safePath } from './safety';
 import { applyEditorText, loadDocument, PendingUpdates, textDiff } from './logic';
@@ -16,7 +16,7 @@ type SyncRpc = { query(name: 'sync:loadFile', args: FileArgs): Promise<any>; que
 export function startSync(ctx: vscode.ExtensionContext, auth: Auth): vscode.Disposable {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
-	const convexUrl = vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '');
+	const convexUrl = appConvexUrl();
 	if (!root || !projectId || !convexUrl) return new vscode.Disposable(() => undefined);
 	const client = new ConvexClient(convexUrl); client.setAuth(async () => (await auth.convexToken()) ?? null);
 	const rpc = client as unknown as SyncRpc; const states = new Map<string, State>();

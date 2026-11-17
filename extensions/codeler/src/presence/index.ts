@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { ConvexClient } from 'convex/browser';
-import { Auth } from '../auth';
+import { Auth, convexUrl as appConvexUrl } from '../auth';
 import { colorFor, followSelection, Presence, recentRows, TAG_COLORS } from './logic';
 import { isSafeRelativePath } from '../sync/safety';
 
@@ -22,7 +22,7 @@ const insideUri = (root: string, file: string) => {
 export function startPresence(ctx: vscode.ExtensionContext, auth: Auth, bridge: PresenceBridge): vscode.Disposable {
 	const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const projectId = vscode.workspace.getConfiguration('codeler').get<string>('projectId', '');
-	const convexUrl = vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '');
+	const convexUrl = appConvexUrl();
 	if (!root || !projectId || !convexUrl) return new vscode.Disposable(() => undefined);
 	const client = new ConvexClient(convexUrl); client.setAuth(async () => (await auth.convexToken()) ?? null); const rpc = client as unknown as Rpc;
 	const windowId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
