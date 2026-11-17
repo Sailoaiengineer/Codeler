@@ -143,6 +143,8 @@ jobs:
           npm ci --prefix extensions/codeler
           python -m pip install --quiet Pillow
           python -I brand/make_icons.py
+      - name: Install Linux build libraries (same as VSCodium)
+        run: sudo apt-get update -y && sudo apt-get install -y libkrb5-dev
       - name: Build Linux package
         run: cd vscodium && bash ./dev/build.sh -p
       - name: Upload Linux package
