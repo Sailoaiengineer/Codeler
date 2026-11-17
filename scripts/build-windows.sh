@@ -29,5 +29,7 @@ cd "${VSCODIUM_DIR}"
 export VSCODE_ARCH=x64
 # Codeler names for VSCodium's scripts (installer/zip names, the command-line launcher)
 export APP_NAME=Codeler BINARY_NAME=codeler ORG_NAME=Codeler
+# .msi needs the WiX toolset; the two Inno Setup installers (all users, per user) and the zip are built
+export SHOULD_BUILD_MSI=no SHOULD_BUILD_MSI_NOUP=no
 export CODELER_UPDATE_URL="${CODELER_UPDATE_URL-}"
 ./dev/build.sh -sp

@@ -1,3 +1,19 @@
+diff --git a/dev/build.sh b/dev/build.sh
+index 2fa271b..a47f481 100755
+--- a/dev/build.sh
++++ b/dev/build.sh
+@@ -5,9 +5,9 @@
+ # to run with Bash: "C:\Program Files\Git\bin\bash.exe" ./dev/build.sh
+ ###
+ 
+-export APP_NAME="VSCodium"
++export APP_NAME="${APP_NAME:-VSCodium}"
+ export ASSETS_REPOSITORY="VSCodium/vscodium"
+-export BINARY_NAME="codium"
++export BINARY_NAME="${BINARY_NAME:-codium}"
+ export CI_BUILD="no"
+ export GH_REPO_PATH="VSCodium/vscodium"
+ export ORG_NAME="VSCodium"
 diff --git a/prepare_vscode.sh b/prepare_vscode.sh
 index 3f551ca..b999c6a 100755
 --- a/prepare_vscode.sh
