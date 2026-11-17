@@ -22,8 +22,11 @@ jobs:
         shell: bash
     env:
       VSCODE_ARCH: x64
-      # Placeholder for a future Windows signing integration.
-      CODELER_WINDOWS_SIGNING_CERT: ${{ secrets.CODELER_WINDOWS_SIGNING_CERT }}
+      # .msi needs WiX; ship the Inno Setup installers only (same as scripts/build-windows.sh)
+      SHOULD_BUILD_MSI: "no"
+      SHOULD_BUILD_MSI_NOUP: "no"
+      # Signing runs only once the SignPath secrets exist (after SignPath approves the project).
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,14 +47,32 @@ jobs:
           python -I brand/make_icons.py
       - name: Build Windows installer
         run: bash ./vscodium/dev/build.sh -p
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
+      # SignPath only signs files that were stored as a GitHub artifact by this workflow.
+      - name: Upload unsigned installers
+        id: upload-unsigned
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeler-windows-x64-unsigned
+          path: vscodium/assets/*.exe
+          retention-days: 1
+      - name: Sign installers (SignPath, approved by hand)
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # up to 8 h to approve the request on signpath.io
+          wait-for-completion-timeout-in-seconds: 28800
+          output-artifact-directory: vscodium/assets/
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: codeler-windows-x64
-          path: |
-            vscodium/assets/*.exe
-            vscodium/assets/*.msi
-            vscodium/VSCode-win32-x64/**
+          path: vscodium/assets/*.exe
 
   macos:
     strategy:

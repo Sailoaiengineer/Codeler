@@ -15,7 +15,7 @@ index 2fa271b..a47f481 100755
  export GH_REPO_PATH="VSCodium/vscodium"
  export ORG_NAME="VSCodium"
 diff --git a/prepare_vscode.sh b/prepare_vscode.sh
-index 3f551ca..b999c6a 100755
+index 3f551ca..e58b141 100755
 --- a/prepare_vscode.sh
 +++ b/prepare_vscode.sh
 @@ -7,6 +7,8 @@ if [[ "${VSCODE_QUALITY}" == "insider" ]]; then
@@ -105,3 +105,14 @@ index 3f551ca..b999c6a 100755
  fi
  
  setpath_json "product" "tunnelApplicationConfig" '{}'
+@@ -284,8 +287,8 @@ if [[ "${OS_NAME}" == "linux" ]]; then
+   sed -i 's|Visual Studio Code|VSCodium|' resources/linux/rpm/code.spec.template
+ elif [[ "${OS_NAME}" == "windows" ]]; then
+   # code.iss
+-  sed -i 's|https://code.visualstudio.com|https://vscodium.com|' build/win32/code.iss
+-  sed -i 's|Microsoft Corporation|VSCodium|' build/win32/code.iss
++  sed -i 's|https://code.visualstudio.com|https://github.com/Sailoaiengineer/Codeler|' build/win32/code.iss
++  sed -i 's|Microsoft Corporation|Codeler|' build/win32/code.iss
+ fi
+ 
+ cd ..
