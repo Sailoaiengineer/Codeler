@@ -47,7 +47,7 @@ jobs:
           python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build Windows installer
-        run: bash ./vscodium/dev/build.sh -p
+        run: cd vscodium && bash ./dev/build.sh -p
       # SignPath only signs files that were stored as a GitHub artifact by this workflow.
       - name: Upload unsigned installers
         id: upload-unsigned
@@ -108,7 +108,7 @@ jobs:
           python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build macOS package
-        run: bash ./vscodium/dev/build.sh -p
+        run: cd vscodium && bash ./dev/build.sh -p
       - name: Upload macOS package
         uses: actions/upload-artifact@v4
         with:
@@ -141,7 +141,7 @@ jobs:
           python -m pip install --quiet Pillow
           python -I brand/make_icons.py
       - name: Build Linux package
-        run: bash ./vscodium/dev/build.sh -p
+        run: cd vscodium && bash ./dev/build.sh -p
       - name: Upload Linux package
         uses: actions/upload-artifact@v4
         with:

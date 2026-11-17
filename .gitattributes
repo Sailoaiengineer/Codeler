@@ -1,0 +1,5 @@
+# Same as VSCodium: LF everywhere, so patches apply on Windows CI runners (they default to CRLF checkouts)
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
