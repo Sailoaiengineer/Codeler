@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { allowedVerificationUrl, pollDeviceToken, storeSessionToken } from './auth-logic';
+import { allowedVerificationUrl, pollDeviceToken, sessionUrlAllowed, storeSessionToken } from './auth-logic';
 
 // Desktop sign-in (OAuth device flow through Better Auth). The session token lives in the OS keychain
 // via SecretStorage; it never goes into settings or files.
@@ -8,11 +8,14 @@ const SECRET_KEY = 'codeler.session';
 
 export interface Me { id: string; name: string; email: string; image: string | null }
 
+// Read from user settings only, so a cloned repo's .vscode/settings.json can't point the session at another host.
+const appSetting = (key: 'siteUrl' | 'convexUrl', fallback: string) => (vscode.workspace.getConfiguration('codeler').inspect<string>(key)?.globalValue ?? fallback).replace(/\/+$/, '');
 // shortcut: localhost until the hosted Codeler site exists; then set the real URL as the default
-export const siteUrl = () => vscode.workspace.getConfiguration('codeler').get<string>('siteUrl', 'http://localhost:3000').replace(/\/+$/, '');
-const convexUrl = () => vscode.workspace.getConfiguration('codeler').get<string>('convexUrl', '').replace(/\/+$/, '');
+export const siteUrl = () => appSetting('siteUrl', 'http://localhost:3000');
+export const convexUrl = () => appSetting('convexUrl', '');
 
 async function post<T>(path: string, body: unknown, token?: string): Promise<{ ok: boolean; status: number; data: T }> {
+	if (token && !sessionUrlAllowed(siteUrl())) throw new Error('The Codeler site must use https.');
 	const res = await fetch(siteUrl() + path, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -83,7 +86,7 @@ export class Auth {
 	/** Short-lived Convex token for this session, for queries and live updates. */
 	async convexToken(): Promise<string | undefined> {
 		const session = await this.secrets.get(SECRET_KEY);
-		if (!session) return undefined;
+		if (!session || !sessionUrlAllowed(siteUrl())) return undefined;
 		const res = await fetch(`${siteUrl()}/api/auth/convex/token`, { headers: { Authorization: `Bearer ${session}` } }).catch(() => undefined);
 		if (res?.status === 401) { await this.signOut(); return undefined; } // session revoked or expired
 		if (!res?.ok) return undefined;
@@ -95,7 +98,7 @@ export class Auth {
 	async query<T>(path: string, args: Record<string, unknown> = {}): Promise<T | undefined> {
 		const url = convexUrl();
 		const jwt = await this.convexToken();
-		if (!url || !jwt) return undefined;
+		if (!url || !jwt || !sessionUrlAllowed(url)) return undefined;
 		const res = await fetch(`${url}/api/query`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },

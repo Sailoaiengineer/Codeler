@@ -1,5 +1,15 @@
+import { createHash } from 'node:crypto';
+
 export type RunCommand = { name: string; command: string };
 export type RunConfig = { commands: RunCommand[]; default?: string };
+
+// Trust is kept per workspace as hashes of the exact command text, so any edit asks again.
+export const commandFingerprint = (command: string): string => createHash('sha256').update(command, 'utf8').digest('hex');
+export const isCommandTrusted = (trusted: string[], command: string): boolean => trusted.includes(commandFingerprint(command));
+export function trustCommand(trusted: string[], command: string): string[] {
+	const hash = commandFingerprint(command);
+	return trusted.includes(hash) ? trusted : [...trusted, hash].slice(-200);
+}
 
 const max = 500;
 const text = (value: unknown): value is string => typeof value === 'string' && value.length <= max;

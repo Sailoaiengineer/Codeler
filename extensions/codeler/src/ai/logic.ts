@@ -175,6 +175,15 @@ export async function callProvider(provider: Provider, o: RequestOptions, fetchF
 }
 
 export type McpServerConfig = { name: string; command?: string; args: string[]; env?: Record<string, string>; url?: string };
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// The setup line is pasted into a shell, so a quote, $ or backtick in a path could run something else. Such paths are refused.
+export function mcpSetupLine(server: string, root: string): { line: string } | { error: string } {
+	if (/["$`]/.test(server) || /["$`]/.test(root)) {
+		return { error: 'This folder path has a quote, $ or backtick, so Codeler will not copy a setup line for it. Rename the folder or add the server by hand.' };
+	}
+	return { line: `claude mcp add codeler -- node "${server}" "${root}"` };
+}
 
 // Checks the codeler.mcpServers setting. Bad entries are reported and skipped; good ones are kept.
 export function validateMcpServers(raw: unknown): { servers: McpServerConfig[]; errors: string[] } {
@@ -196,6 +205,7 @@ export function validateMcpServers(raw: unknown): { servers: McpServerConfig[]; 
 			let u: URL;
 			try { u = new URL(e.url); } catch { return fail('url is not a valid address.'); }
 			if (u.protocol !== 'https:' && u.protocol !== 'http:') return fail('url must start with http:// or https://.');
+			if (u.protocol === 'http:' && !LOCAL_HOSTS.has(u.hostname)) return fail('plain http:// is allowed only for localhost. Use https:// for other servers.');
 			seen.add(name); servers.push({ name, url: e.url, args: [] });
 			return;
 		}

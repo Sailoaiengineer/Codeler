@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRequest, callProvider, checkRelativePath, parseEditBlocks, parseReply, toolName, validateMcpServers, windowsLaunch, type Turn } from './logic.ts';
+import { buildRequest, callProvider, checkRelativePath, mcpSetupLine, parseEditBlocks, parseReply, toolName, validateMcpServers, windowsLaunch, type Turn } from './logic.ts';
 
 const turns: Turn[] = [{ role: 'user', text: 'hi' }];
 const KEY = 'sk-test-KEY-123';
@@ -124,6 +124,25 @@ test('MCP config: bad entries are reported and skipped', () => {
 	assert.equal(servers[0].name, 'dup');
 	assert.equal(errors.length, 7);
 	assert.match(errors.join('\n'), /used twice/);
+});
+
+test('MCP config: plain http is allowed only for local addresses', () => {
+	for (const url of ['http://localhost:8787/mcp', 'http://127.0.0.1:8787/mcp', 'http://[::1]:8787/mcp']) {
+		assert.deepEqual(validateMcpServers([{ name: 'local', url }]).errors, [], url);
+	}
+	for (const url of ['http://example.com/mcp', 'http://localhost.evil.example/mcp', 'http://192.168.1.5/mcp']) {
+		assert.equal(validateMcpServers([{ name: 'remote', url }]).servers.length, 0, url);
+		assert.equal(validateMcpServers([{ name: 'remote', url }]).errors.length, 1, url);
+	}
+	assert.equal(validateMcpServers([{ name: 'remote', url: 'https://example.com/mcp' }]).servers.length, 1);
+});
+
+test('MCP setup line quotes paths and refuses unsafe characters', () => {
+	assert.deepEqual(mcpSetupLine('C:\\ext\\server.js', 'C:\\Users\\me\\my project'), { line: 'claude mcp add codeler -- node "C:\\ext\\server.js" "C:\\Users\\me\\my project"' });
+	for (const bad of ['C:\\a"b', 'C:\\a$b', 'C:\\a`b']) {
+		assert.ok('error' in mcpSetupLine('C:\\ext\\server.js', bad), `expected refusal for ${bad}`);
+		assert.ok('error' in mcpSetupLine(bad, 'C:\\ok'), `expected refusal for ${bad} as server path`);
+	}
 });
 
 test('MCP config: a non-list value is an error', () => {
