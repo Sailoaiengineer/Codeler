@@ -2,6 +2,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { requireProjectMember } from "./access";
+import { takeRateToken } from "./rateLimit";
+import { fitsPending, LIMITS, MINUTE_MS } from "./limits";
 
 const MAX_UPDATE = 256 * 1024;
 const MAX_FILE = 2 * 1024 * 1024;
@@ -43,7 +45,7 @@ export const loadFile = query({
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) return null;
     const snapshot = await ctx.db.query("syncSnapshots").withIndex("by_file_version", (q) => q.eq("fileId", file._id).eq("version", file.snapshotVersion)).unique();
-    const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", file.snapshotVersion)).collect();
+    const updates = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", file.snapshotVersion)).take(1000);
     return {
       file,
       snapshot: snapshot ? responseBytes(snapshot.state) : new ArrayBuffer(0),
@@ -58,7 +60,7 @@ export const updates = query({
     await requireProjectMember(ctx, projectId); checkPath(path);
     const file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
     if (!file) return { version: 0, updates: [] };
-    const rows = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", afterVersion)).collect();
+    const rows = await ctx.db.query("syncUpdates").withIndex("by_file_version", (q) => q.eq("fileId", file._id).gt("version", afterVersion)).take(1000);
     return { version: file.version, updates: rows.sort((a, b) => a.version - b.version).map((row) => ({ ...row, update: responseBytes(row.update) })) };
   },
 });
@@ -66,10 +68,13 @@ export const updates = query({
 export const pushUpdates = mutation({
   args: { projectId: v.id("projects"), path: v.string(), updates: v.array(v.bytes()), size: v.number() },
   handler: async (ctx, { projectId, path, updates, size }) => {
-    await requireProjectMember(ctx, projectId); checkPath(path);
+    const { user } = await requireProjectMember(ctx, projectId); checkPath(path);
     if (size < 0 || size > MAX_FILE || updates.length > 100) throw new ConvexError("File or update batch is too large.");
     for (const update of updates) checkUpdate(update);
+    await takeRateToken(ctx, `push:${user._id}:${projectId}`, LIMITS.pushPerMinute, MINUTE_MS, "Too many sync updates. Slow down a little.");
     let file = await ctx.db.query("syncFiles").withIndex("by_project_path", (q) => q.eq("projectId", projectId).eq("path", path)).unique();
+    // Versions are sequential and a snapshot deletes everything up to its version, so this is the number of unsnapshotted updates.
+    if (file && !fitsPending(file.version - file.snapshotVersion, updates.length)) throw new ConvexError("This file needs a snapshot first.");
     if (!file) {
       const now = Date.now(); const id = await ctx.db.insert("syncFiles", { projectId, path, size, snapshotVersion: 0, version: 0, updatedAt: now });
       file = await ctx.db.get(id); if (!file) throw new ConvexError("Could not create sync file.");

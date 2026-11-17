@@ -153,6 +153,6 @@ describe("two-user live sync and presence", () => {
     });
     const joiner = t.withIdentity(identity("joiner"));
     for (let i = 0; i < 10; i++) await expectRejected(joiner.action(api.teamsNode.requestJoin, { joinCode: "RATE-LIMIT", password: "wrong-password" }), /Wrong team code or password/);
-    await expectRejected(joiner.action(api.teamsNode.requestJoin, { joinCode: "RATE-LIMIT", password: "wrong-password" }), /Too many wrong tries/);
+    await expectRejected(joiner.action(api.teamsNode.requestJoin, { joinCode: "RATE-LIMIT", password: "wrong-password" }), /Too many tries/);
   });
 });

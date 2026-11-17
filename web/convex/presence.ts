@@ -1,6 +1,8 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireProjectMember } from "./access";
+import { internal } from "./_generated/api";
+import { batchFull, LIMITS, oldestBeyond } from "./limits";
 
 const validPath = (path: string) => {
   if (!path || path.includes("\0") || path.startsWith("/") || path.startsWith("\\") || /^[A-Za-z]:/.test(path)) return false;
@@ -23,7 +25,11 @@ export const heartbeat = mutation({
     const existing = await ctx.db.query("presence").withIndex("by_project_window", q => q.eq("projectId", a.projectId).eq("window", a.window)).unique();
     const value = { projectId: a.projectId, userId: user._id, window: a.window, path: a.path, line: a.cursor.line, character: a.cursor.character, selection: a.selection, lastSeen: Date.now() };
     if (existing && existing.userId !== user._id) throw new ConvexError("That presence window belongs to another user.");
-    if (existing) await ctx.db.patch(existing._id, value); else await ctx.db.insert("presence", value);
+    if (existing) { await ctx.db.patch(existing._id, value); return; }
+    // A new window: make room by dropping this person's least recently seen windows in this project.
+    const mine = await ctx.db.query("presence").withIndex("by_project_user", q => q.eq("projectId", a.projectId).eq("userId", user._id)).take(50);
+    for (const old of oldestBeyond(mine, LIMITS.maxPresenceWindows - 1)) await ctx.db.delete(old._id);
+    await ctx.db.insert("presence", value);
   },
 });
 
@@ -43,9 +49,10 @@ export const list = query({
 
 export const cleanup = internalMutation({
   args: {},
-  handler: async (ctx) => {
-    const cutoff = Date.now() - 2 * 60_000;
-    const rows = await ctx.db.query("presence").withIndex("by_project").collect();
-    for (const row of rows) if (row.lastSeen < cutoff) await ctx.db.delete(row._id);
+  handler: async (ctx): Promise<void> => {
+    const cutoff = Date.now() - LIMITS.presenceStaleMs;
+    const rows = await ctx.db.query("presence").withIndex("by_lastSeen", q => q.lt("lastSeen", cutoff)).take(LIMITS.batch);
+    for (const row of rows) await ctx.db.delete(row._id);
+    if (batchFull(rows.length)) await ctx.scheduler.runAfter(0, internal.presence.cleanup, {});
   },
 });

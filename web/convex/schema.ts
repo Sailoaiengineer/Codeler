@@ -16,7 +16,7 @@ export default defineSchema({
     passwordHash: v.string(), // scrypt, hex
     passwordSalt: v.string(), // hex
     createdAt: v.number(),
-  }).index("by_joinCode", ["joinCode"]),
+  }).index("by_joinCode", ["joinCode"]).index("by_image", ["imageId"]),
 
   members: defineTable({
     teamId: v.id("teams"),
@@ -50,11 +50,18 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_team", ["teamId"]),
 
-  // Wrong-password attempts, for rate limiting joins.
+  // Team join tries (right or wrong), counted per person and per team code, for rate limiting.
   joinAttempts: defineTable({
     userId: v.string(),
+    code: v.optional(v.string()), // normalised join code; older rows have none
     at: v.number(),
-  }).index("by_user_at", ["userId", "at"]),
+  }).index("by_user_at", ["userId", "at"]).index("by_code_at", ["code", "at"]),
+
+  // Recent events per rate-limit key (sync pushes, uploads, activity). Pruned hourly.
+  rateEvents: defineTable({
+    key: v.string(),
+    at: v.number(),
+  }).index("by_key_at", ["key", "at"]).index("by_at", ["at"]),
 
   // ChatGPT: live sync
   syncFiles: defineTable({
@@ -93,7 +100,8 @@ export default defineSchema({
       endLine: v.number(), endCharacter: v.number(),
     }),
     lastSeen: v.number(),
-  }).index("by_project", ["projectId"]).index("by_project_window", ["projectId", "window"]),
+  }).index("by_project", ["projectId"]).index("by_project_window", ["projectId", "window"])
+    .index("by_project_user", ["projectId", "userId"]).index("by_lastSeen", ["lastSeen"]),
 
   // Claude (Haiku): chat + activity
   messages: defineTable({
