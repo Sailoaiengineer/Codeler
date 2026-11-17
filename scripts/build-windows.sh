@@ -13,6 +13,8 @@ PINNED_COMMIT="$(jq -r '.commit' "${VSCODIUM_DIR}/upstream/stable.json")"
 echo "Resetting VS Code to pinned commit ${PINNED_COMMIT}; preserving node_modules."
 git -C "${VSCODE_DIR}" reset --hard "${PINNED_COMMIT}"
 git -C "${VSCODE_DIR}" clean -fd -e node_modules -e .build
+# git-ignored leftovers from a previous run break VSCodium's CLI step ("mkdir openssl: File exists")
+rm -rf "${VSCODE_DIR}/cli/openssl" "${VSCODE_DIR}/cli/vscode-openssl-prebuilt-"*.tgz
 
 mkdir -p "${VSCODIUM_DIR}/patches/user"
 cp "${ROOT_DIR}/patches/codeler-core.patch" "${VSCODIUM_DIR}/patches/user/codeler-core.patch"
