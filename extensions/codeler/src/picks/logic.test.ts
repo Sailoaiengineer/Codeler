@@ -15,6 +15,11 @@ test('theme and language lists have the approved ids', () => {
 	assert.deepEqual(LANGUAGE_PACKS.map(l => l.id), ['ms-python.python', 'redhat.java', 'llvm-vs-code-extensions.vscode-clangd', 'muhammad-sammy.csharp', 'golang.go', 'rust-lang.rust-analyzer', 'bmewburn.vscode-intelephense-client']);
 });
 
+test('theme and language labels match Open VSX display names', () => {
+	assert.deepEqual(THEME_EXTENSIONS.map(t => t.label), ['Dracula Theme Official', 'GitHub Theme', 'One Dark Pro', 'Material Icon Theme']);
+	assert.deepEqual(LANGUAGE_PACKS.map(l => l.label), ['Python', 'Language Support for Java(TM) by Red Hat', 'clangd', 'C#', 'Go', 'rust-analyzer', 'PHP Intelephense']);
+});
+
 test('items fall into the three groups with the built-in theme first', () => {
 	const count = (g: string) => ITEMS.filter(i => i.group === g).length;
 	assert.equal(count('ai'), 3);

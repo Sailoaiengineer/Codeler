@@ -20,20 +20,20 @@ export const AI_TOOLS: readonly { id: ToolId; label: string; docs: string }[] = 
 export const BUILTIN_THEME = 'Codeler Dark';
 export const BUILTIN_ITEM = 'theme:codeler-dark';
 export const THEME_EXTENSIONS: readonly { id: string; label: string; picker: Picker }[] = [
-	{ id: 'dracula-theme.theme-dracula', label: 'Dracula Official', picker: 'workbench.action.selectTheme' },
+	{ id: 'dracula-theme.theme-dracula', label: 'Dracula Theme Official', picker: 'workbench.action.selectTheme' },
 	{ id: 'GitHub.github-vscode-theme', label: 'GitHub Theme', picker: 'workbench.action.selectTheme' },
-	{ id: 'zhuangtongfa.material-theme', label: 'Material Theme', picker: 'workbench.action.selectTheme' },
+	{ id: 'zhuangtongfa.material-theme', label: 'One Dark Pro', picker: 'workbench.action.selectTheme' },
 	{ id: 'PKief.material-icon-theme', label: 'Material Icon Theme', picker: 'workbench.action.selectIconTheme' },
 ];
 
 export const LANGUAGE_PACKS: readonly { id: string; label: string }[] = [
 	{ id: 'ms-python.python', label: 'Python' },
-	{ id: 'redhat.java', label: 'Java' },
-	{ id: 'llvm-vs-code-extensions.vscode-clangd', label: 'C/C++' },
+	{ id: 'redhat.java', label: 'Language Support for Java(TM) by Red Hat' },
+	{ id: 'llvm-vs-code-extensions.vscode-clangd', label: 'clangd' },
 	{ id: 'muhammad-sammy.csharp', label: 'C#' },
 	{ id: 'golang.go', label: 'Go' },
-	{ id: 'rust-lang.rust-analyzer', label: 'Rust' },
-	{ id: 'bmewburn.vscode-intelephense-client', label: 'PHP' },
+	{ id: 'rust-lang.rust-analyzer', label: 'rust-analyzer' },
+	{ id: 'bmewburn.vscode-intelephense-client', label: 'PHP Intelephense' },
 ];
 
 export type Item = { id: string; group: Group; label: string };

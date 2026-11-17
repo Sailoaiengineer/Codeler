@@ -157,3 +157,21 @@ Not checked:
 - `bash scripts/sync-extension.sh` could not complete because the concurrent run's `vscodium/vscode/extensions/codeler/node_modules/hono/dist` directory prevented removal; no files from that node_modules tree were deleted.
 - The environment retained one inaccessible `cloudflared.exe` after the smoke test; `taskkill /IM cloudflared.exe /T /F` returned access denied, so a clean process-gone assertion could not be completed.
 - No full VSCodium UI run or live team-chat send was available; clipboard fallback was exercised.
+
+## Task 9 — extension IDs and names
+
+Queried `GET https://open-vsx.org/api/<namespace>/<name>` for every theme and language-extension ID used by picks and run offers. All exist and none is deprecated or unpublished. Updated pick labels to match Open VSX `displayName`; IDs and the shared run-offer list required no changes.
+
+| ID | Exists | Open VSX display name | Action |
+|---|---|---|---|
+| `dracula-theme.theme-dracula` | yes | Dracula Theme Official | updated pick label |
+| `GitHub.github-vscode-theme` | yes | GitHub Theme | no change |
+| `zhuangtongfa.material-theme` | yes | One Dark Pro | updated pick label |
+| `PKief.material-icon-theme` | yes | Material Icon Theme | no change |
+| `ms-python.python` | yes | Python | no change |
+| `redhat.java` | yes | Language Support for Java(TM) by Red Hat | updated pick label |
+| `llvm-vs-code-extensions.vscode-clangd` | yes | clangd | updated pick label |
+| `muhammad-sammy.csharp` | yes | C# | no change |
+| `golang.go` | yes | Go | no change |
+| `rust-lang.rust-analyzer` | yes | rust-analyzer | updated pick label |
+| `bmewburn.vscode-intelephense-client` | yes | PHP Intelephense | updated pick label |
