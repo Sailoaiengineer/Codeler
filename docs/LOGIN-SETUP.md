@@ -13,9 +13,9 @@
 
 3. In Google Cloud Console, create or select a project, configure the OAuth consent screen, and create an OAuth client of type **Web application**. Add this authorized redirect URI:
 
-   `https://<your-convex-deployment>.convex.site/api/auth/callback/google`
+   `<SITE_URL>/api/auth/callback/google` — locally: `http://localhost:3000/api/auth/callback/google`
 
-   Use the exact Convex site URL for the deployment; do not add a trailing path or substitute the Next.js site URL. Copy the client ID and secret into the Convex environment variables above.
+   It must be the Codeler web site address (SITE_URL), not the `.convex.site` address: the web site's `/api/auth` route forwards to Convex, and Better Auth builds the callback from SITE_URL. When you publish the site, add the public one too (e.g. `https://codeler.example.com/api/auth/callback/google`). Copy the client ID and secret into the Convex environment variables above.
 
 4. Start the web app locally:
 

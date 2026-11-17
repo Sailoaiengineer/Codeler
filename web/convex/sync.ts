@@ -13,7 +13,7 @@ function checkPath(path: string) {
   if (!isSafeRelativePath(path)) throw new ConvexError("Invalid project path.");
 }
 
-function checkUpdate(update: Uint8Array) {
+function checkUpdate(update: ArrayBuffer | Uint8Array) {
   if (update.byteLength === 0 || update.byteLength > MAX_UPDATE) throw new ConvexError("Sync update is too large.");
 }
 
