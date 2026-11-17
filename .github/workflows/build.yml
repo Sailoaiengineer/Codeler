@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
-          git -C vscodium apply patches/vscodium-build.patch
+          git -C vscodium apply ../patches/vscodium-build.patch
           python -I brand/make_icons.py
       - name: Build Windows installer
         run: bash ./vscodium/dev/build.sh -p
@@ -79,9 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
-            arch: x64
-          - runner: macos-14
+          - runner: macos-latest
             arch: arm64
     runs-on: ${{ matrix.runner }}
     env:
@@ -105,7 +103,7 @@ jobs:
         run: |
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
-          git -C vscodium apply patches/vscodium-build.patch
+          git -C vscodium apply ../patches/vscodium-build.patch
           python -I brand/make_icons.py
       - name: Build macOS package
         run: bash ./vscodium/dev/build.sh -p
@@ -137,7 +135,7 @@ jobs:
         run: |
           mkdir -p vscodium/patches/user
           cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
-          git -C vscodium apply patches/vscodium-build.patch
+          git -C vscodium apply ../patches/vscodium-build.patch
           python -I brand/make_icons.py
       - name: Build Linux package
         run: bash ./vscodium/dev/build.sh -p
