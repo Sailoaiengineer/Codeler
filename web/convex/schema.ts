@@ -117,7 +117,7 @@ export default defineSchema({
     kind: v.union(
       v.literal("joined"), v.literal("left"), v.literal("approved"),
       v.literal("file_created"), v.literal("file_changed"), v.literal("file_deleted"), v.literal("file_renamed"),
-      v.literal("run"), v.literal("snapshot"),
+      v.literal("run"), v.literal("snapshot"), v.literal("removed"),
     ),
     detail: v.string(), // <= 300 chars
     createdAt: v.number(),
@@ -129,5 +129,5 @@ export default defineSchema({
     messageId: v.id("messages"),
     read: v.boolean(),
     createdAt: v.number(),
-  }).index("by_user_read", ["userId", "read"]),
+  }).index("by_user_read", ["userId", "read"]).index("by_project", ["projectId"]),
 });

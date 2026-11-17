@@ -70,6 +70,9 @@
 	</div>
 	<div class="foot"><button class="btn-primary" id="join-submit">Request to join</button></div>
 </form>
+<div class="foot" id="share-row" style="display:none;justify-content:flex-start;border-top:0;padding-top:0">
+	<button class="btn-outline" type="button" id="share">Share this folder with a team</button>
+</div>
 </div>
 <script nonce="{{nonce}}" src="{{js}}"></script>
 <script nonce="{{nonce}}">
@@ -109,14 +112,18 @@ $('add').addEventListener('click', () => {
 });
 $('email').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('add').click(); } });
 
+let avatar; // { type, dataUrl } once a valid image is chosen; Convex checks it again on save
 $('file').addEventListener('change', () => {
 	const f = $('file').files[0];
+	avatar = undefined;
 	if (!f) return;
+	if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) { err.textContent = 'Use a PNG, JPEG or WebP image.'; return; }
 	if (f.size > 1024 * 1024) { err.textContent = 'Image must be under 1 MB.'; return; }
 	const r = new FileReader();
-	r.onload = () => document.querySelector('.drop').replaceChildren(el('img', { src: r.result, alt: 'Team image' }));
+	r.onload = () => { avatar = { type: f.type, dataUrl: r.result }; document.querySelector('.drop').replaceChildren(el('img', { src: r.result, alt: 'Team image' })); };
 	r.readAsDataURL(f);
 });
+$('share').addEventListener('click', () => vscode.postMessage({ type: 'shareFolder' }));
 
 $('cancel').addEventListener('click', () => vscode.postMessage({ type: 'close' }));
 $('form').addEventListener('submit', e => {
@@ -125,7 +132,7 @@ $('form').addEventListener('submit', e => {
 	err.textContent = '';
 	if (!$('name').value.trim()) return $('name').focus(), err.textContent = 'Give your team a name.';
 	if ($('pass').value.length < 8) return $('pass').focus(), err.textContent = 'The team password needs at least 8 characters.';
-	vscode.postMessage({ type: 'createTeam', name: $('name').value, description: $('desc').value, password: $('pass').value, invites });
+	vscode.postMessage({ type: 'createTeam', name: $('name').value, description: $('desc').value, password: $('pass').value, invites, image: avatar });
 });
 $('join-form').addEventListener('submit', e => {
 	e.preventDefault(); joinErr.textContent = ''; joinOk.textContent = '';
@@ -134,7 +141,7 @@ $('join-form').addEventListener('submit', e => {
 	vscode.postMessage({ type: 'joinTeam', joinCode: $('join-code').value, password: $('join-pass').value });
 });
 onCodelerMessage(m => {
-	if (m.type === 'teamData') { signedIn = Boolean(m.signedIn); setButton(); }
+	if (m.type === 'teamData') { signedIn = Boolean(m.signedIn); setButton(); $('share-row').style.display = signedIn && m.folderOpen ? '' : 'none'; }
 	if (m.type === 'teamError') { err.textContent = m.error; joinErr.textContent = m.error; }
 	if (m.type === 'teamCreated') {
 		err.textContent = ''; document.querySelector('.card-body').prepend(el('div', { class: 'success', role: 'status' }, `Team created. Your join code is ${m.joinCode}. `, el('button', { class: 'btn-ghost', type: 'button', onclick: async e => { await navigator.clipboard?.writeText(m.joinCode); e.currentTarget.textContent = 'Copied'; } }, 'Copy')));

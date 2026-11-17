@@ -9,7 +9,7 @@ const TAG_COLORS = ['#3fbf5c', '#2684f5', '#f2842b', '#b26bd1'];
 
 export type ChatRow = { _id: string; userId: string; name: string; text: string; createdAt: number; attachment: { name: string; type: string; size: number; url: string | null } | null };
 export type ActivityRow = { _id: string; userId: string; name: string; kind: ActivityKind; detail: string; createdAt: number };
-export type ActivityKind = 'joined' | 'left' | 'approved' | 'file_created' | 'file_changed' | 'file_deleted' | 'file_renamed' | 'run' | 'snapshot';
+export type ActivityKind = 'joined' | 'left' | 'approved' | 'removed' | 'file_created' | 'file_changed' | 'file_deleted' | 'file_renamed' | 'run' | 'snapshot';
 
 const isWord = (ch: string | undefined) => ch !== undefined && /[\p{L}\p{N}_]/u.test(ch);
 
@@ -70,7 +70,7 @@ export function panelMessage(row: ChatRow, me?: string) {
 }
 
 const VERBS: Record<ActivityKind, string> = {
-	joined: 'joined', left: 'left', approved: 'was approved to join', file_created: 'created', file_changed: 'edited',
+	joined: 'joined', left: 'left', approved: 'was approved to join', removed: 'was removed', file_created: 'created', file_changed: 'edited',
 	file_deleted: 'deleted', file_renamed: 'renamed', run: 'ran', snapshot: 'saved a snapshot of',
 };
 
