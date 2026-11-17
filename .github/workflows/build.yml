@@ -1,0 +1,126 @@
+name: Build Codeler
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+env:
+  VSCODIUM_COMMIT: ca7f7b44b5e5c3faa663f6cdc043998f71936653
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    env:
+      VSCODE_ARCH: x64
+      # Placeholder for a future Windows signing integration.
+      CODELER_WINDOWS_SIGNING_CERT: ${{ secrets.CODELER_WINDOWS_SIGNING_CERT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Clone pinned VSCodium
+        run: |
+          git clone https://github.com/VSCodium/vscodium.git vscodium
+          git -C vscodium checkout "$VSCODIUM_COMMIT"
+      - name: Apply Codeler build inputs
+        run: |
+          mkdir -p vscodium/patches/user
+          cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
+          git -C vscodium apply patches/vscodium-build.patch
+          python -I brand/make_icons.py
+      - name: Build Windows installer
+        run: bash ./vscodium/dev/build.sh -p
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeler-windows-x64
+          path: |
+            vscodium/assets/*.exe
+            vscodium/assets/*.msi
+            vscodium/VSCode-win32-x64/**
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      VSCODE_ARCH: ${{ matrix.arch }}
+      # Placeholders for a future Apple signing/notarization integration.
+      CODELER_APPLE_SIGNING_IDENTITY: ${{ secrets.CODELER_APPLE_SIGNING_IDENTITY }}
+      CODELER_APPLE_NOTARIZATION_PROFILE: ${{ secrets.CODELER_APPLE_NOTARIZATION_PROFILE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Clone pinned VSCodium
+        run: |
+          git clone https://github.com/VSCodium/vscodium.git vscodium
+          git -C vscodium checkout "$VSCODIUM_COMMIT"
+      - name: Apply Codeler build inputs
+        run: |
+          mkdir -p vscodium/patches/user
+          cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
+          git -C vscodium apply patches/vscodium-build.patch
+          python -I brand/make_icons.py
+      - name: Build macOS package
+        run: bash ./vscodium/dev/build.sh -p
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeler-macos-${{ matrix.arch }}
+          path: |
+            vscodium/assets/**
+            vscodium/VSCode-darwin-${{ matrix.arch }}/**
+
+  linux:
+    runs-on: ubuntu-22.04
+    env:
+      VSCODE_ARCH: x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Clone pinned VSCodium
+        run: |
+          git clone https://github.com/VSCodium/vscodium.git vscodium
+          git -C vscodium checkout "$VSCODIUM_COMMIT"
+      - name: Apply Codeler build inputs
+        run: |
+          mkdir -p vscodium/patches/user
+          cp patches/codeler-core.patch vscodium/patches/user/codeler-core.patch
+          git -C vscodium apply patches/vscodium-build.patch
+          python -I brand/make_icons.py
+      - name: Build Linux package
+        run: bash ./vscodium/dev/build.sh -p
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeler-linux-x64
+          path: |
+            vscodium/assets/**
+            vscodium/VSCode-linux-x64/**

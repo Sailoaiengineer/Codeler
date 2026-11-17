@@ -12,6 +12,7 @@ import { startRun } from './run';
 import { startHistory } from './history';
 import { startPicks } from './picks';
 import { startAi } from './ai';
+import { startShare } from './share';
 
 const presenceViews = new Set<vscode.Webview>();
 let presenceRows: PresenceRow[] = [];
@@ -167,6 +168,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// shortcut: team vs solo comes from a preview setting until real teams exist (login step)
 	const mode = () => vscode.workspace.getConfiguration('codeler').get<'team' | 'solo'>('layoutPreview', 'team');
 	let teamPageActive = false;
+	let sharing = false;
 	let decorationEvent: vscode.EventEmitter<vscode.Uri | undefined> | undefined;
 	const pushTitlebar = () => {
 		const team = mode() === 'team';
@@ -181,11 +183,13 @@ export function activate(ctx: vscode.ExtensionContext) {
 			page: teamPageActive ? 'team' : undefined,
 			account: auth.me ? { name: auth.me.name, photo: auth.me.image ?? undefined } : undefined,
 			dirty: vscode.workspace.textDocuments.some(d => d.isDirty),
+			sharing,
 		}).then(undefined, () => { /* running in stock VSCodium: no Codeler title bar to fill */ });
 		team ? people.show() : people.hide();
 		showCursors = team;
 		paintCursors();
 	};
+	ctx.subscriptions.push(startShare(ctx, value => { sharing = value; pushTitlebar(); }));
 	const presenceBridge = { onRows: (rows: PresenceRow[]) => {
 		presenceRows = rows; for (const view of presenceViews) void view.postMessage({ type: 'presence', people: presencePeople(), rows, followingUserId });
 		pushTitlebar(); paintCursors(); decorationEvent?.fire(undefined);
@@ -232,7 +236,6 @@ export function activate(ctx: vscode.ExtensionContext) {
 			teamPanel.onDidDispose(() => { presenceViews.delete(teamWebview); teamPanel = undefined; expand(false); });
 			 render(ctx, teamWebview, 'team', teams, auth);
 		}),
-		vscode.commands.registerCommand('codeler.share', () => vscode.window.showInformationMessage('Sharing your preview works once teams are connected.')),
 		vscode.commands.registerCommand('codeler.toggleSampleCursors', () => { showCursors = !showCursors; paintCursors(); }),
 		vscode.commands.registerCommand('codeler.pickProject', async () => {
 			const mine = auth.me ? await teams.mine().catch(() => []) : [];

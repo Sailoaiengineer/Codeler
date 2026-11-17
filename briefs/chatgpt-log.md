@@ -113,3 +113,47 @@ Not checked:
 
 - No full VSCodium UI run, real terminal command execution, PATH variation, extension installation, or official download page interaction was performed.
 - The literal `npx` type-check command could not run because npm attempted to create a blocked machine cache directory; the installed repository TypeScript binary produced the passing check above.
+
+## Task 8 — packaging
+
+Built:
+
+- Added `scripts/build-windows.sh`, which resets the VS Code checkout to the pinned `1.143.1` commit while preserving `node_modules`, copies the Codeler user patch, regenerates icons, and invokes VSCodium's Windows x64 packaging build.
+- Added `scripts/vscodium-commit.txt` with VSCodium commit `ca7f7b44b5e5c3faa663f6cdc043998f71936653`.
+- Added `.github/workflows/build.yml` for unsigned Windows x64, macOS x64/arm64, and Linux x64 artifact builds, with named Apple and Windows signing-secret placeholders and no update URL.
+- Updated `patches/README.md` with release-build instructions.
+- Copied `patches/codeler-core.patch` to `vscodium/patches/user/codeler-core.patch`.
+
+Verification:
+
+- `bash -n scripts/build-windows.sh`: passed.
+- Patch-copy hash comparison: passed.
+- `bash scripts/build-windows.sh`: started at 2026-11-17, stopped after about 2 seconds because Git Bash reported `jq: command not found` on line 8. No installer or packaged app was produced; output file names and sizes: none.
+
+Not checked:
+
+- Smoke test was skipped because no `Codeler.exe` was built; therefore there are no smoke-test log lines.
+- The build could not reach VSCodium's packaging stages or produce Windows, macOS, or Linux artifacts.
+- `jq` was not downloaded because the brief requires asking the user first; Rust was not downloaded or changed.
+- GitHub Actions was not run locally. Signing remains intentionally unsigned and `CODELER_UPDATE_URL` remains unset.
+
+## Task 4 — preview sharing
+
+Built:
+
+- Added `extensions/codeler/src/share/logic.ts` and `logic.test.ts` for localhost port parsing, common-port candidates, tunnel URL parsing, cloudflared arguments, and share state transitions.
+- Added `extensions/codeler/src/share/index.ts`: probes candidate ports, asks for modal consent with the anyone-with-the-link warning, starts cloudflared without a shell, parses the quick-tunnel URL, copies it to the clipboard when chat has no send export, shows a clickable stop status item, stops on command/deactivation, and stops after 30 seconds of failed port checks.
+- Replaced the placeholder `codeler.share` command registration in `extension.ts`, started the share subsystem during activation, and pushed a `sharing` title-bar state field. The Claude-owned core title bar still hardcodes the Share label; it should consume this field to change the label to Stop sharing.
+
+Verification:
+
+- `node --test extensions/codeler/src/share/*.test.ts`: 4 passed, 0 failed.
+- `npm.cmd run gulp transpile-extension:codeler`: completed with 0 compilation errors after the extension source was staged into the VSCodium destination.
+- Runtime-import grep found no sibling `.ts` imports in runtime JavaScript; `.ts` imports remain only in transpiled test files, matching the repository test pattern.
+- Real smoke test used a local HTTP server on port 5199 and a stubbed vscode host: a `https://*.trycloudflare.com` URL was printed and fetched with HTTP 200; stop was requested and the local server was stopped.
+
+Not checked:
+
+- `bash scripts/sync-extension.sh` could not complete because the concurrent run's `vscodium/vscode/extensions/codeler/node_modules/hono/dist` directory prevented removal; no files from that node_modules tree were deleted.
+- The environment retained one inaccessible `cloudflared.exe` after the smoke test; `taskkill /IM cloudflared.exe /T /F` returned access denied, so a clean process-gone assertion could not be completed.
+- No full VSCodium UI run or live team-chat send was available; clipboard fallback was exercised.

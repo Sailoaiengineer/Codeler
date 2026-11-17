@@ -1,5 +1,5 @@
 diff --git a/build/gulpfile.extensions.ts b/build/gulpfile.extensions.ts
-index bc1f9fba..58e27ff1 100644
+index bc1f9fba71c..58e27ff1e59 100644
 --- a/build/gulpfile.extensions.ts
 +++ b/build/gulpfile.extensions.ts
 @@ -84,6 +84,7 @@ const compilations = [
@@ -11,7 +11,7 @@ index bc1f9fba..58e27ff1 100644
  	'extensions/typescript-language-features/web/tsconfig.json',
  	'extensions/typescript-language-features/tsconfig.json',
 diff --git a/src/vs/platform/window/common/window.ts b/src/vs/platform/window/common/window.ts
-index 7e31cd31..dec075ac 100644
+index 7e31cd31c3a..dec075ac25d 100644
 --- a/src/vs/platform/window/common/window.ts
 +++ b/src/vs/platform/window/common/window.ts
 @@ -383,7 +383,7 @@ export function getWindowControlsStyle(configurationService: IConfigurationServi
@@ -24,7 +24,7 @@ index 7e31cd31..dec075ac 100644
  /** Centers macOS traffic lights vertically, optionally keeping their horizontal inset independent of height. */
  export function getMacOSWindowControlsPosition(height: number, osVersion: string, horizontalInset?: number): IPoint | null {
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
-index e8edbe1b..e0aa6df6 100644
+index e8edbe1bfdd..e0aa6df682e 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 +++ b/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts
 @@ -41,6 +41,17 @@ import { IWorkbenchEnvironmentService } from '../../../services/environment/comm
@@ -92,7 +92,7 @@ index e8edbe1b..e0aa6df6 100644
  			this.element.style.setProperty('--activity-bar-width', `${this.baseWidth}px`);
 diff --git a/src/vs/workbench/browser/parts/activitybar/media/codeler.css b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
 new file mode 100644
-index 00000000..bc72d6ee
+index 00000000000..bc72d6ee854
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/activitybar/media/codeler.css
 @@ -0,0 +1,39 @@
@@ -136,7 +136,7 @@ index 00000000..bc72d6ee
 +.monaco-workbench .activitybar.codeler-expanded > .content .monaco-action-bar .action-item .badge { left: 22px; }
 +.monaco-workbench .activitybar.codeler-expanded .menubar { width: 48px; }
 diff --git a/src/vs/workbench/browser/parts/compositeBarActions.ts b/src/vs/workbench/browser/parts/compositeBarActions.ts
-index fe7bce2f..f5187264 100644
+index fe7bce2f083..f51872641d7 100644
 --- a/src/vs/workbench/browser/parts/compositeBarActions.ts
 +++ b/src/vs/workbench/browser/parts/compositeBarActions.ts
 @@ -392,6 +392,13 @@ export class CompositeBarActionViewItem extends BaseActionViewItem {
@@ -155,7 +155,7 @@ index fe7bce2f..f5187264 100644
  			this.label.classList.add(...this.compositeBarActionItem.classNames);
 diff --git a/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts b/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts
 new file mode 100644
-index 00000000..b425599f
+index 00000000000..b425599f7c6
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/titlebar/codelerTitlebar.ts
 @@ -0,0 +1,127 @@
@@ -288,7 +288,7 @@ index 00000000..b425599f
 +}
 diff --git a/src/vs/workbench/browser/parts/titlebar/media/codeler.css b/src/vs/workbench/browser/parts/titlebar/media/codeler.css
 new file mode 100644
-index 00000000..b0f49427
+index 00000000000..b0f49427fda
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/titlebar/media/codeler.css
 @@ -0,0 +1,69 @@
@@ -362,7 +362,7 @@ index 00000000..b0f49427
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { width: 48px; }
 +.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon:not(.codicon) { background-size: 28px; }
 diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
-index bfc8839c..3ec78447 100644
+index bfc8839cc65..3ec78447b6a 100644
 --- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
 @@ -53,7 +53,8 @@ import { IView } from '../../../../base/browser/ui/grid/grid.js';
