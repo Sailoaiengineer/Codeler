@@ -129,11 +129,7 @@ function render(ctx: vscode.ExtensionContext, webview: vscode.Webview, page: str
 	});
 }
 
-// Name-tag cursors as in the reference image: a coloured caret plus a label after the line.
-const tagTypes = sample.people.map(p => vscode.window.createTextEditorDecorationType({
-	borderStyle: 'solid', borderColor: p.color, borderWidth: '0 0 0 2px',
-	after: { contentText: p.name, backgroundColor: p.color, color: '#ffffff', margin: '0 0 0 4px', fontWeight: '600', textDecoration: ';font-size:12px;padding:1px 6px;border-radius:4px;font-family:Inter,Segoe UI,sans-serif' },
-}));
+// Name-tag cursors: a coloured caret plus a label after the line, only for real teammates.
 const realTagTypes = new Map<string, vscode.TextEditorDecorationType>();
 let showCursors = false;
 function paintCursors(editor = vscode.window.activeTextEditor) {
@@ -153,11 +149,7 @@ function paintCursors(editor = vscode.window.activeTextEditor) {
 		for (const [id, type] of realTagTypes) if (!visible.has(id)) editor.setDecorations(type, []);
 		return;
 	}
-	sample.people.forEach((p, i) => {
-		const line = Math.min(p.cursorLine - 1, editor.document.lineCount - 1);
-		const end = editor.document.lineAt(Math.max(line, 0)).range.end;
-		editor.setDecorations(tagTypes[i], showCursors && line >= 0 ? [new vscode.Range(end, end)] : []);
-	});
+	for (const type of realTagTypes.values()) editor.setDecorations(type, []);
 }
 
 export function activate(ctx: vscode.ExtensionContext) {
@@ -189,7 +181,6 @@ export function activate(ctx: vscode.ExtensionContext) {
 	connected.color = '#30c760';
 	connected.tooltip = 'Connected to Codeler';
 	const people = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 999);
-	people.text = `$(organization) ${sample.people.length} collaborators`;
 	people.command = 'workbench.view.extension.codeler-collaborators';
 	connected.show();
 
@@ -204,16 +195,18 @@ export function activate(ctx: vscode.ExtensionContext) {
 		const root = vscode.workspace.workspaceFolders?.[0];
 		vscode.commands.executeCommand('_codeler.titlebar.setState', {
 			mode: mode(),
-			project: team ? (vscode.workspace.getConfiguration('codeler').get<string>('projectName', '') || sample.teams[0].name) : root?.name ?? 'Open project',
+			project: team ? (vscode.workspace.getConfiguration('codeler').get<string>('projectName', '') || root?.name || 'Open project') : root?.name ?? 'Open project',
 			branch: 'main',
-			people: team ? (activeTeam ? presencePeople() : sample.people) : [],
-			unread: team ? (activeTeam ? unreadCount() : 1) : 0,
+			people: team && activeTeam ? presencePeople() : [],
+			unread: team && activeTeam ? unreadCount() : 0,
 			page: teamPageActive ? 'team' : undefined,
 			account: auth.me ? { name: auth.me.name, photo: auth.me.image ?? undefined } : undefined,
 			dirty: vscode.workspace.textDocuments.some(d => d.isDirty),
 			sharing,
 		}).then(undefined, () => { /* running in stock VSCodium: no Codeler title bar to fill */ });
-		team ? people.show() : people.hide();
+		const online = activeTeam ? presencePeople().length : 0;
+		people.text = `$(organization) ${online} ${online === 1 ? 'collaborator' : 'collaborators'}`;
+		team && online ? people.show() : people.hide();
 		showCursors = team;
 		paintCursors();
 	};
@@ -244,7 +237,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 
 	let teamPanel: vscode.WebviewPanel | undefined;
 	ctx.subscriptions.push(
-		connected, people, ...tagTypes,
+		connected, people,
 		vscode.commands.registerCommand('codeler.createTeam', () => {
 			// Image 3: the Team page fills the window, the side bar hides and the activity bar shows labels.
 			const expand = (on: boolean) => {

@@ -16,7 +16,7 @@ const row = a => {
 	return el('div', { class: 'item' }, avatar(p),
 		el('div', { class: 'grow' }, el('div', {}, el('b', {}, p.name), ' ', a.text), el('div', { class: 'sub' }, a.time)));
 };
-const draw = items => list.replaceChildren(...items.map(row));
+const draw = items => list.replaceChildren(...(items.length ? items.map(row) : [el('div', { style: 'opacity:.6;padding:12px;' }, 'No activity yet.')]));
 draw(data.activity);
 onCodelerMessage(m => {
 	if (m.type === 'activity') draw(m.items);

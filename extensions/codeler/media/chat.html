@@ -51,7 +51,7 @@ const row = m => {
 			el('div', { class: 'text' }, richText(m.text)),
 			link ? el('a', { onclick: () => vscode.postMessage({ type: 'chatOpenFile', url: link }) }, m.attachment.name + ' (' + sizeLabel(m.attachment.size) + ')') : null));
 };
-const drawChat = list => { msgs.replaceChildren(...list.map(row)); msgs.scrollTop = msgs.scrollHeight; };
+const drawChat = list => { msgs.replaceChildren(...(list.length ? list.map(row) : [el('div', { class: 'empty', style: 'opacity:.6;padding:12px;' }, 'No messages yet. Sign in and open a team project to chat.')])); msgs.scrollTop = msgs.scrollHeight; };
 drawChat(data.chat);
 
 const drawOnline = people => { const online = document.getElementById('online'); online.replaceChildren(...people.filter(p => p.online).map(p => el('div', { class: 'person' }, avatar(p, true), p.name))); };
