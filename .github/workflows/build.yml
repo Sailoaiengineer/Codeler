@@ -148,6 +148,9 @@ jobs:
           python -I brand/make_icons.py
       - name: Install Linux build libraries (same as VSCodium)
         run: sudo apt-get update -y && sudo apt-get install -y libkrb5-dev
+      # VSCodium's snap step needs a stores/snapcraft/build.sh that this pinned commit does not ship; we ship deb, rpm and tar.
+      - name: Skip the snap step
+        run: sed -i -e 's|^  \. \./stores/snapcraft/build\.sh|  :|' -e 's|^    mv stores/snapcraft/build/\*\.snap assets/|    :|' vscodium/build/linux/prepare_assets.sh
       - name: Build Linux package
         run: cd vscodium && bash ./dev/build.sh -p
       - name: Upload Linux package
