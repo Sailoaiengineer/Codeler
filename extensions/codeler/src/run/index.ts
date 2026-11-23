@@ -102,6 +102,7 @@ let terminal: vscode.Terminal | undefined;
 let running = false;
 async function runCommand(ctx: vscode.ExtensionContext, command: RunCommand): Promise<void> {
 	if (!await confirmRun(ctx, command)) return;
+	await vscode.workspace.saveAll(false); // the command reads files from disk, so unsaved edits would not run
 	if (!terminal || terminal.exitStatus !== undefined) terminal = vscode.window.createTerminal(`Codeler: ${command.name}`);
 	terminal.show(true);
 	if (running) { terminal.sendText('\u0003', false); await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -125,6 +126,7 @@ export function startRun(ctx: vscode.ExtensionContext): vscode.Disposable {
 		vscode.window.onDidCloseTerminal(item => { if (item === terminal) running = false; }),
 		vscode.commands.registerCommand('codeler.openHtml', async () => {
 			const editor = vscode.window.activeTextEditor;
+			if (editor) await editor.document.save();
 			if (editor) await vscode.commands.executeCommand('simpleBrowser.show', editor.document.uri.toString());
 		}),
 		vscode.commands.registerCommand('codeler.run', async () => {
